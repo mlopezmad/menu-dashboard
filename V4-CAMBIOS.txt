@@ -1,0 +1,17 @@
+MENÚ DASHBOARD V4.0
+
+Archivos modificados:
+- index.html
+- app.js
+- style.css
+- functions/api/publish.js
+
+Funciones:
+- Edición de primeros, segundos y dieta/plancha.
+- Añadir y eliminar platos.
+- Crear y eliminar fechas.
+- Marcar festivos.
+- Detección y descarte de cambios.
+- Publicación real en Menu-comedor/menu.json.
+- Protección mediante SHA para no sobrescribir cambios recientes.
+- Mantiene login, logout, PWA e iconos.

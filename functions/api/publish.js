@@ -3,127 +3,15 @@ const GITHUB_REPO = "Menu-comedor";
 const GITHUB_BRANCH = "main";
 const MENU_PATH = "menu.json";
 
-function jsonResponse(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      "Content-Type": "application/json; charset=UTF-8",
-      "Cache-Control": "no-store"
-    }
-  });
-}
+function jsonResponse(data,status=200){return new Response(JSON.stringify(data),{status,headers:{"Content-Type":"application/json; charset=UTF-8","Cache-Control":"no-store"}})}
+function githubHeaders(token){return {Accept:"application/vnd.github+json",Authorization:`Bearer ${token}`,"X-GitHub-Api-Version":"2022-11-28","User-Agent":"menu-dashboard"}}
+function decodeBase64Utf8(value){const bin=atob(value.replace(/\n/g,""));const bytes=Uint8Array.from(bin,c=>c.charCodeAt(0));return new TextDecoder().decode(bytes)}
+function encodeBase64Utf8(value){const bytes=new TextEncoder().encode(value);let bin="";for(const b of bytes)bin+=String.fromCharCode(b);return btoa(bin)}
+function validarMenu(menu){if(!menu||typeof menu!=="object"||!menu.dias||typeof menu.dias!=="object"||Array.isArray(menu.dias))throw new Error("El menú no tiene la estructura esperada.");for(const [fecha,dia] of Object.entries(menu.dias)){if(!/^\d{4}-\d{2}-\d{2}$/.test(fecha))throw new Error(`Fecha no válida: ${fecha}`);if(!dia||typeof dia!=="object")throw new Error(`El día ${fecha} no es válido.`);for(const campo of ["primeros","segundos","dieta"]){if(dia[campo]!==undefined&&!Array.isArray(dia[campo]))throw new Error(`${fecha}: ${campo} debe ser una lista.`);if(Array.isArray(dia[campo])&&dia[campo].some(x=>typeof x!=="string"))throw new Error(`${fecha}: todos los platos deben ser texto.`);}}}
+async function obtenerMenuActual(token){const url=`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${MENU_PATH}?ref=${GITHUB_BRANCH}`;const response=await fetch(url,{headers:githubHeaders(token)});if(!response.ok)throw new Error(`GitHub no pudo leer menu.json (${response.status}).`);const archivo=await response.json();if(!archivo?.content||!archivo?.sha)throw new Error("GitHub no devolvió menu.json correctamente.");const menu=JSON.parse(decodeBase64Utf8(archivo.content));validarMenu(menu);return {menu,sha:archivo.sha}}
 
-function githubHeaders(token) {
-  return {
-    Accept: "application/vnd.github+json",
-    Authorization: `Bearer ${token}`,
-    "X-GitHub-Api-Version": "2022-11-28",
-    "User-Agent": "menu-dashboard"
-  };
-}
+export async function onRequestGet(context){const token=context.env.GITHUB_TOKEN;if(!token)return jsonResponse({ok:false,error:"El secreto GITHUB_TOKEN no está configurado."},500);try{const {menu,sha}=await obtenerMenuActual(token);return jsonResponse({ok:true,repository:`${GITHUB_OWNER}/${GITHUB_REPO}`,branch:GITHUB_BRANCH,path:MENU_PATH,sha,menu})}catch(error){console.error(error);return jsonResponse({ok:false,error:error instanceof Error?error.message:"No se pudo comprobar GitHub."},500)}}
 
-async function obtenerMenuActual(token) {
-  const url =
-    `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}` +
-    `/contents/${MENU_PATH}?ref=${GITHUB_BRANCH}`;
+export async function onRequestPost(context){const token=context.env.GITHUB_TOKEN;if(!token)return jsonResponse({ok:false,error:"El secreto GITHUB_TOKEN no está configurado."},500);try{let body;try{body=await context.request.json()}catch{return jsonResponse({ok:false,error:"La solicitud no contiene JSON válido."},400)}const menu=body?.menu;const shaRecibido=typeof body?.sha==="string"?body.sha:"";validarMenu(menu);const actual=await obtenerMenuActual(token);if(!shaRecibido||shaRecibido!==actual.sha)return jsonResponse({ok:false,error:"El menú cambió en GitHub desde que lo abriste. Recarga el Dashboard antes de publicar."},409);const contenido=JSON.stringify(menu,null,2)+"\n";const url=`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${MENU_PATH}`;const response=await fetch(url,{method:"PUT",headers:{...githubHeaders(token),"Content-Type":"application/json"},body:JSON.stringify({message:"Actualizar menú desde Dashboard V4",content:encodeBase64Utf8(contenido),sha:actual.sha,branch:GITHUB_BRANCH})});const detalle=await response.json().catch(()=>({}));if(!response.ok)throw new Error(detalle?.message?`GitHub: ${detalle.message}`:`GitHub no pudo guardar menu.json (${response.status}).`);const nuevoSha=detalle?.content?.sha;if(!nuevoSha)throw new Error("GitHub guardó el archivo, pero no devolvió el nuevo SHA.");return jsonResponse({ok:true,sha:nuevoSha,menu})}catch(error){console.error(error);return jsonResponse({ok:false,error:error instanceof Error?error.message:"No se pudo publicar el menú."},500)}}
 
-  const response = await fetch(url, {
-    headers: githubHeaders(token)
-  });
-
-  if (!response.ok) {
-    const detalle = await response.text();
-
-    throw new Error(
-      `GitHub no pudo leer menu.json (${response.status}): ${detalle}`
-    );
-  }
-
-  const archivo = await response.json();
-
-  if (!archivo?.content || !archivo?.sha) {
-    throw new Error(
-      "GitHub no ha devuelto el contenido o el SHA de menu.json."
-    );
-  }
-
-  const contenidoBase64 = archivo.content.replace(/\n/g, "");
-  const contenidoTexto = decodeURIComponent(
-    Array.from(atob(contenidoBase64))
-      .map(caracter =>
-        `%${caracter.charCodeAt(0).toString(16).padStart(2, "0")}`
-      )
-      .join("")
-  );
-
-  const menu = JSON.parse(contenidoTexto);
-
-  if (
-    !menu ||
-    typeof menu !== "object" ||
-    !menu.dias ||
-    typeof menu.dias !== "object"
-  ) {
-    throw new Error(
-      "El menu.json actual no tiene la estructura esperada."
-    );
-  }
-
-  return {
-    menu,
-    sha: archivo.sha
-  };
-}
-
-export async function onRequestGet(context) {
-  const token = context.env.GITHUB_TOKEN;
-
-  if (!token) {
-    return jsonResponse(
-      {
-        ok: false,
-        error: "El secreto GITHUB_TOKEN no está configurado."
-      },
-      500
-    );
-  }
-
-  try {
-    const { menu, sha } = await obtenerMenuActual(token);
-    const fechas = Object.keys(menu.dias).sort();
-
-    return jsonResponse({
-      ok: true,
-      repository: `${GITHUB_OWNER}/${GITHUB_REPO}`,
-      branch: GITHUB_BRANCH,
-      path: MENU_PATH,
-      sha,
-      totalDates: fechas.length,
-      firstDate: fechas[0] || null,
-      lastDate: fechas[fechas.length - 1] || null
-    });
-  } catch (error) {
-    console.error("Error comprobando GitHub:", error);
-
-    return jsonResponse(
-      {
-        ok: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "No se pudo comprobar GitHub."
-      },
-      500
-    );
-  }
-}
-
-export function onRequest() {
-  return jsonResponse(
-    {
-      ok: false,
-      error: "Método no permitido."
-    },
-    405
-  );
-}
+export function onRequest(){return jsonResponse({ok:false,error:"Método no permitido."},405)}
