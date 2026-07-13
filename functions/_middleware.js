@@ -1,6 +1,7 @@
 const SESSION_COOKIE = "menu_dashboard_session";
 
 const PUBLIC_PATHS = new Set([
+  "/login",
   "/login.html",
   "/api/login",
   "/style.css"
@@ -135,41 +136,29 @@ async function validarToken(token, secret) {
     }
 
     return true;
-
   } catch {
     return false;
   }
 }
 
-function respuestaNoAutorizada(pathname) {
-  if (pathname.startsWith("/api/")) {
-    return new Response(
-      JSON.stringify({
-        error: "No autorizado."
-      }),
-      {
-        status: 401,
-        headers: {
-          "Content-Type": "application/json; charset=UTF-8",
-          "Cache-Control": "no-store"
-        }
+function respuestaApiNoAutorizada() {
+  return new Response(
+    JSON.stringify({
+      error: "No autorizado."
+    }),
+    {
+      status: 401,
+      headers: {
+        "Content-Type": "application/json; charset=UTF-8",
+        "Cache-Control": "no-store"
       }
-    );
-  }
-
-  return Response.redirect(
-    new URL("/login.html", "https://menu-dashboard.local"),
-    302
+    }
   );
 }
 
 export async function onRequest(context) {
   const url = new URL(context.request.url);
   const pathname = url.pathname;
-
-  if (PUBLIC_PATHS.has(pathname)) {
-    return context.next();
-  }
 
   const sessionSecret = context.env.SESSION_SECRET;
 
@@ -194,30 +183,27 @@ export async function onRequest(context) {
     sessionSecret
   );
 
-  if (!sesionValida) {
-    if (pathname.startsWith("/api/")) {
-      return new Response(
-        JSON.stringify({
-          error: "No autorizado."
-        }),
-        {
-          status: 401,
-          headers: {
-            "Content-Type": "application/json; charset=UTF-8",
-            "Cache-Control": "no-store"
-          }
-        }
+  if (PUBLIC_PATHS.has(pathname)) {
+    if (
+      sesionValida &&
+      (pathname === "/login" || pathname === "/login.html")
+    ) {
+      return Response.redirect(
+        new URL("/", url.origin).toString(),
+        302
       );
     }
 
-    const loginUrl = new URL("/login.html", url.origin);
-
-    return Response.redirect(loginUrl.toString(), 302);
+    return context.next();
   }
 
-  if (pathname === "/login.html") {
+  if (!sesionValida) {
+    if (pathname.startsWith("/api/")) {
+      return respuestaApiNoAutorizada();
+    }
+
     return Response.redirect(
-      new URL("/", url.origin).toString(),
+      new URL("/login", url.origin).toString(),
       302
     );
   }
