@@ -268,10 +268,45 @@ function volverAlInicio() {
   });
 }
 
+async function cerrarSesion() {
+  const boton = $("cerrar-sesion");
+
+  if (boton) {
+    boton.disabled = true;
+    boton.textContent = "Saliendo…";
+  }
+
+  try {
+    const respuesta = await fetch("/api/logout", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json"
+      }
+    });
+
+    if (!respuesta.ok) {
+      throw new Error("No se pudo cerrar la sesión.");
+    }
+
+    window.location.replace("/login");
+  } catch (error) {
+    console.error("Error al cerrar sesión:", error);
+
+    if (boton) {
+      boton.disabled = false;
+      boton.textContent = "Salir";
+    }
+
+    window.alert("No se ha podido cerrar la sesión. Inténtalo de nuevo.");
+  }
+}
+
 function prepararEventos() {
   const botonAbrirEditor = $("abrir-editor");
   const botonVolver = $("volver-inicio");
   const selector = $("selector-fecha");
+  const botonCerrarSesion = $("cerrar-sesion");
 
   if (botonAbrirEditor) {
     botonAbrirEditor.addEventListener(
@@ -284,6 +319,13 @@ function prepararEventos() {
     botonVolver.addEventListener(
       "click",
       volverAlInicio
+    );
+  }
+
+  if (botonCerrarSesion) {
+    botonCerrarSesion.addEventListener(
+      "click",
+      cerrarSesion
     );
   }
 

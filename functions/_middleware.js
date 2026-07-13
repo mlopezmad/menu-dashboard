@@ -4,7 +4,10 @@ const PUBLIC_PATHS = new Set([
   "/login",
   "/login.html",
   "/api/login",
-  "/style.css"
+  "/style.css",
+  "/manifest.webmanifest",
+  "/icon-192.png",
+  "/icon-512.png"
 ]);
 
 function textToBytes(text) {
