@@ -12,7 +12,8 @@
 
   <title>Gestor del menú</title>
 
-  <link rel="stylesheet" href="style.css"> </head>
+  <link rel="stylesheet" href="style.css">
+</head>
 
 <body>
 
@@ -86,21 +87,46 @@
           Estado
         </p>
 
-        <h2>
-          Dashboard preparado
+        <h2 id="estado-titulo">
+          Comprobando menú…
         </h2>
 
-        <p>
-          En el siguiente paso conectaremos esta interfaz con el menú publicado.
+        <p id="estado-detalle">
+          Conectando con el menú publicado.
         </p>
 
       </div>
 
-      <span class="status-dot"></span>
+      <span
+        id="estado-punto"
+        class="status-dot status-loading"
+      ></span>
+
+    </section>
+
+    <section class="status-card menu-summary">
+
+      <div>
+
+        <p class="status-label">
+          Menú publicado
+        </p>
+
+        <h2 id="resumen-titulo">
+          Cargando fechas…
+        </h2>
+
+        <p id="resumen-detalle">
+          Esperando información del archivo menu.json.
+        </p>
+
+      </div>
 
     </section>
 
   </main>
+
+  <script src="app.js"></script>
 
 </body>
 </html>
