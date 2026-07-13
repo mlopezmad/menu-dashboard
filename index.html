@@ -19,108 +19,264 @@
 
   <main class="dashboard">
 
-    <header class="dashboard-header">
+    <!-- INICIO -->
 
-      <p class="eyebrow">
-        Menú comedor
-      </p>
+    <section id="vista-inicio">
 
-      <h1>
-        Gestor del menú
-      </h1>
+      <header class="dashboard-header">
 
-      <p class="intro">
-        Actualiza, revisa y corrige el menú semanal antes de publicarlo.
-      </p>
-
-    </header>
-
-    <section class="dashboard-grid">
-
-      <article class="panel-card">
-
-        <div class="panel-icon">
-          ↑
-        </div>
-
-        <h2>
-          Subir menú
-        </h2>
-
-        <p>
-          Procesa una imagen o un PDF y revisa los platos antes de publicar.
+        <p class="eyebrow">
+          Menú comedor
         </p>
 
-        <button type="button" disabled>
-          Próximamente
-        </button>
+        <h1>
+          Gestor del menú
+        </h1>
 
-      </article>
+        <p class="intro">
+          Actualiza, revisa y corrige el menú semanal antes de publicarlo.
+        </p>
 
-      <article class="panel-card">
+      </header>
 
-        <div class="panel-icon">
-          ✎
+      <section class="dashboard-grid">
+
+        <article class="panel-card">
+
+          <div class="panel-icon">
+            ↑
+          </div>
+
+          <h2>
+            Subir menú
+          </h2>
+
+          <p>
+            Procesa una imagen o un PDF y revisa los platos antes de publicar.
+          </p>
+
+          <button type="button" disabled>
+            Próximamente
+          </button>
+
+        </article>
+
+        <article class="panel-card">
+
+          <div class="panel-icon">
+            ✎
+          </div>
+
+          <h2>
+            Editar menú
+          </h2>
+
+          <p>
+            Consulta las fechas ya publicadas y modifica cualquier plato.
+          </p>
+
+          <button
+            id="abrir-editor"
+            class="primary-action"
+            type="button"
+          >
+            Abrir editor
+          </button>
+
+        </article>
+
+      </section>
+
+      <section class="status-card">
+
+        <div>
+
+          <p class="status-label">
+            Estado
+          </p>
+
+          <h2 id="estado-titulo">
+            Comprobando menú…
+          </h2>
+
+          <p id="estado-detalle">
+            Conectando con el menú publicado.
+          </p>
+
         </div>
 
-        <h2>
+        <span
+          id="estado-punto"
+          class="status-dot status-loading"
+        ></span>
+
+      </section>
+
+      <section class="status-card menu-summary">
+
+        <div>
+
+          <p class="status-label">
+            Menú publicado
+          </p>
+
+          <h2 id="resumen-titulo">
+            Cargando fechas…
+          </h2>
+
+          <p id="resumen-detalle">
+            Esperando información del archivo menu.json.
+          </p>
+
+        </div>
+
+      </section>
+
+    </section>
+
+    <!-- EDITOR -->
+
+    <section
+      id="vista-editor"
+      class="editor-view"
+      hidden
+    >
+
+      <header class="editor-header">
+
+        <button
+          id="volver-inicio"
+          class="back-button"
+          type="button"
+        >
+          ← Volver
+        </button>
+
+        <p class="eyebrow">
+          Editor
+        </p>
+
+        <h1>
           Editar menú
-        </h2>
+        </h1>
 
-        <p>
-          Consulta las fechas ya publicadas y modifica cualquier plato.
+        <p class="intro">
+          Selecciona una fecha para consultar el menú publicado.
         </p>
 
-        <button type="button" disabled>
-          Próximamente
-        </button>
+      </header>
 
-      </article>
+      <section class="editor-selector-card">
 
-    </section>
+        <label for="selector-fecha">
+          Fecha publicada
+        </label>
 
-    <section class="status-card">
+        <select id="selector-fecha">
+          <option value="">
+            Cargando fechas…
+          </option>
+        </select>
 
-      <div>
+      </section>
 
-        <p class="status-label">
-          Estado
-        </p>
+      <section
+        id="editor-contenido"
+        class="editor-content"
+        hidden
+      >
 
-        <h2 id="estado-titulo">
-          Comprobando menú…
-        </h2>
+        <article class="editor-day-card">
 
-        <p id="estado-detalle">
-          Conectando con el menú publicado.
-        </p>
+          <div class="editor-day-header">
 
-      </div>
+            <div>
 
-      <span
-        id="estado-punto"
-        class="status-dot status-loading"
-      ></span>
+              <p class="status-label">
+                Día seleccionado
+              </p>
 
-    </section>
+              <h2 id="editor-fecha">
+                —
+              </h2>
 
-    <section class="status-card menu-summary">
+            </div>
 
-      <div>
+            <span class="read-only-badge">
+              Solo lectura
+            </span>
 
-        <p class="status-label">
-          Menú publicado
-        </p>
+          </div>
 
-        <h2 id="resumen-titulo">
-          Cargando fechas…
-        </h2>
+          <div class="editor-group">
 
-        <p id="resumen-detalle">
-          Esperando información del archivo menu.json.
-        </p>
+            <h3>
+              Primeros
+            </h3>
 
-      </div>
+            <div
+              id="editor-primeros"
+              class="editor-list"
+            ></div>
+
+          </div>
+
+          <div class="editor-group">
+
+            <h3>
+              Segundos
+            </h3>
+
+            <div
+              id="editor-segundos"
+              class="editor-list"
+            ></div>
+
+          </div>
+
+          <div class="editor-group">
+
+            <h3>
+              Dieta y plancha
+            </h3>
+
+            <div
+              id="editor-dieta"
+              class="editor-list"
+            ></div>
+
+          </div>
+
+          <p class="editor-note">
+            En el siguiente paso activaremos la edición y el guardado seguro.
+          </p>
+
+        </article>
+
+      </section>
+
+      <section
+        id="editor-vacio"
+        class="status-card"
+      >
+
+        <div>
+
+          <p class="status-label">
+            Editor
+          </p>
+
+          <h2>
+            Selecciona una fecha
+          </h2>
+
+          <p>
+            El menú aparecerá aquí sin modificar todavía el archivo publicado.
+          </p>
+
+        </div>
+
+      </section>
 
     </section>
 
