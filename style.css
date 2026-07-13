@@ -831,3 +831,358 @@ input {
     border-color: rgba(255, 255, 255, 0.08);
   }
 }
+
+/* V3 EDITOR EDITABLE */
+
+[hidden] {
+  display: none !important;
+}
+
+.compact-editor-header {
+  margin-bottom: 20px;
+}
+
+.editor-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.editor-top-row .back-button {
+  margin-bottom: 0;
+}
+
+.draft-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 9px 13px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 850;
+  white-space: nowrap;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+
+.draft-clean {
+  color: var(--muted);
+  background: rgba(17, 17, 17, 0.07);
+}
+
+.draft-pending {
+  color: #9a5a00;
+  background: rgba(255, 159, 10, 0.16);
+}
+
+.draft-saved {
+  color: #218739;
+  background: rgba(52, 199, 89, 0.14);
+}
+
+.compact-selector {
+  position: sticky;
+  top: max(10px, env(safe-area-inset-top));
+  z-index: 10;
+  margin-bottom: 14px;
+  padding: 17px;
+}
+
+.editable-day-card {
+  padding: 22px;
+}
+
+.compact-day-header {
+  align-items: center;
+  margin-bottom: 22px;
+}
+
+.holiday-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  flex: 0 0 auto;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 850;
+  cursor: pointer;
+  user-select: none;
+}
+
+.holiday-toggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.holiday-switch {
+  position: relative;
+  width: 46px;
+  height: 28px;
+  border-radius: 999px;
+  background: rgba(17, 17, 17, 0.14);
+  transition: background 0.18s ease;
+}
+
+.holiday-switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.18);
+  transition: transform 0.18s ease;
+}
+
+.holiday-toggle input:checked + .holiday-switch {
+  background: var(--red);
+}
+
+.holiday-toggle input:checked + .holiday-switch::after {
+  transform: translateX(18px);
+}
+
+.holiday-toggle input:focus-visible + .holiday-switch {
+  box-shadow: 0 0 0 4px rgba(227, 6, 19, 0.14);
+}
+
+.editor-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+
+.editor-group-header h3 {
+  margin: 0;
+}
+
+.add-item-button {
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  padding: 9px 12px;
+  color: var(--red);
+  background: rgba(227, 6, 19, 0.09);
+  font-size: 13px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.editor-item-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 42px;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.editor-item-editable {
+  min-width: 0;
+  text-overflow: clip;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.editor-item-editable:focus {
+  border-color: rgba(227, 6, 19, 0.58);
+  box-shadow: 0 0 0 4px rgba(227, 6, 19, 0.10);
+}
+
+.remove-item-button {
+  appearance: none;
+  border: 1px solid rgba(227, 6, 19, 0.13);
+  border-radius: 14px;
+  color: var(--red);
+  background: rgba(227, 6, 19, 0.07);
+  font-size: 25px;
+  line-height: 1;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.remove-item-button:active,
+.add-item-button:active {
+  transform: scale(0.97);
+}
+
+.holiday-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 20px;
+  border: 1px solid rgba(227, 6, 19, 0.13);
+  border-radius: 20px;
+  background: rgba(227, 6, 19, 0.07);
+}
+
+.holiday-message > span {
+  font-size: 27px;
+  line-height: 1;
+}
+
+.holiday-message strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 17px;
+  font-weight: 900;
+}
+
+.holiday-message p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.4;
+  font-weight: 650;
+}
+
+.editor-actions {
+  position: sticky;
+  bottom: max(10px, env(safe-area-inset-bottom));
+  z-index: 8;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 28px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.secondary-action,
+.save-draft-button {
+  min-height: 50px;
+  border-radius: 15px;
+  padding: 0 14px;
+  font-size: 15px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: transform 0.14s ease, opacity 0.14s ease;
+}
+
+.secondary-action {
+  color: var(--red);
+  background: rgba(227, 6, 19, 0.09);
+  border: 1px solid rgba(227, 6, 19, 0.13);
+}
+
+.save-draft-button {
+  color: white;
+  background: var(--red);
+  box-shadow: 0 9px 22px rgba(227, 6, 19, 0.22);
+}
+
+.secondary-action:active,
+.save-draft-button:active {
+  transform: scale(0.985);
+}
+
+.secondary-action:disabled,
+.save-draft-button:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+@media (max-width: 700px) {
+  .compact-editor-header h1 {
+    font-size: 48px;
+  }
+
+  .compact-selector {
+    padding: 14px;
+  }
+
+  .editable-day-card {
+    padding: 19px;
+  }
+
+  .compact-day-header {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .compact-day-header h2 {
+    font-size: 29px;
+    line-height: 1.05;
+  }
+
+  .holiday-toggle {
+    flex-direction: column;
+    gap: 5px;
+    font-size: 12px;
+  }
+
+  .editor-group + .editor-group {
+    margin-top: 22px;
+  }
+
+  .editor-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .draft-status {
+    max-width: 175px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+@media (max-width: 390px) {
+  .editor-top-row {
+    align-items: flex-start;
+  }
+
+  .draft-status {
+    max-width: 150px;
+    font-size: 12px;
+  }
+
+  .compact-day-header {
+    flex-direction: column;
+  }
+
+  .holiday-toggle {
+    flex-direction: row;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .draft-clean {
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .draft-pending {
+    color: #ffb340;
+    background: rgba(255, 159, 10, 0.15);
+  }
+
+  .draft-saved {
+    color: #5ed276;
+    background: rgba(52, 199, 89, 0.14);
+  }
+
+  .holiday-switch {
+    background: rgba(255, 255, 255, 0.17);
+  }
+
+  .add-item-button,
+  .secondary-action,
+  .remove-item-button,
+  .holiday-message {
+    background: rgba(227, 6, 19, 0.15);
+    border-color: rgba(227, 6, 19, 0.23);
+  }
+
+  .editor-actions {
+    background: rgba(28, 28, 30, 0.86);
+  }
+}

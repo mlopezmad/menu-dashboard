@@ -1,7 +1,7 @@
 {
   "name": "Menú Dashboard",
   "short_name": "Menú Admin",
-  "description": "Gestor privado del menú semanal del comedor.",
+  "description": "Gestor privado V3 del menú semanal del comedor.",
   "lang": "es",
   "start_url": "/",
   "scope": "/",

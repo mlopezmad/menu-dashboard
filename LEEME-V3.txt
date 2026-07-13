@@ -1,0 +1,23 @@
+MENÚ DASHBOARD · V3 EDITOR
+
+Incluye:
+- Editor editable por fecha.
+- Añadir y eliminar platos.
+- Marcar o desmarcar días festivos.
+- Aviso de cambios pendientes.
+- Cancelar cambios.
+- Guardar borradores localmente en el dispositivo.
+- Confirmación antes de salir con cambios sin guardar.
+- Interfaz móvil más compacta.
+
+Importante:
+- Esta versión NO publica todavía en GitHub.
+- Los borradores se guardan en localStorage del navegador/dispositivo.
+- La versión pública de menu.json no se modifica.
+- DASHBOARD_PASSWORD y SESSION_SECRET siguen guardados en Cloudflare y no forman parte del ZIP.
+
+Instalación en la rama v3-editor:
+1. Sustituir los archivos de la carpeta local del repositorio por los de este ZIP.
+2. Commit en la rama v3-editor.
+3. Push origin.
+4. Probar mediante una vista previa de Cloudflare para la rama o fusionar solo tras validar.

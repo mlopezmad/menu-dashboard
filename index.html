@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Menú Dashboard">
 
-  <title>Gestor del menú</title>
+  <title>Gestor del menú · V3</title>
 
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icon-192.png">
@@ -38,9 +38,7 @@
     <section id="vista-inicio">
       <header class="dashboard-header">
         <p class="eyebrow">Menú comedor</p>
-
         <h1>Gestor del menú</h1>
-
         <p class="intro">
           Actualiza, revisa y corrige el menú semanal antes de publicarlo.
         </p>
@@ -49,30 +47,20 @@
       <section class="dashboard-grid">
         <article class="panel-card">
           <div class="panel-icon" aria-hidden="true">↑</div>
-
           <h2>Subir menú</h2>
-
           <p>
             Procesa una imagen o un PDF y revisa los platos antes de publicar.
           </p>
-
           <button type="button" disabled>Próximamente</button>
         </article>
 
         <article class="panel-card">
           <div class="panel-icon" aria-hidden="true">✎</div>
-
           <h2>Editar menú</h2>
-
           <p>
-            Consulta las fechas ya publicadas y modifica cualquier plato.
+            Modifica fechas publicadas y guarda un borrador sin tocar GitHub.
           </p>
-
-          <button
-            id="abrir-editor"
-            class="primary-action"
-            type="button"
-          >
+          <button id="abrir-editor" class="primary-action" type="button">
             Abrir editor
           </button>
         </article>
@@ -81,86 +69,114 @@
       <section class="status-card">
         <div>
           <p class="status-label">Estado</p>
-
           <h2 id="estado-titulo">Comprobando menú…</h2>
-
-          <p id="estado-detalle">
-            Conectando con el menú publicado.
-          </p>
+          <p id="estado-detalle">Conectando con el menú publicado.</p>
         </div>
-
-        <span
-          id="estado-punto"
-          class="status-dot status-loading"
-          aria-hidden="true"
-        ></span>
+        <span id="estado-punto" class="status-dot status-loading" aria-hidden="true"></span>
       </section>
 
       <section class="status-card menu-summary">
         <div>
           <p class="status-label">Menú publicado</p>
-
           <h2 id="resumen-titulo">Cargando fechas…</h2>
-
-          <p id="resumen-detalle">
-            Esperando información del archivo menu.json.
-          </p>
+          <p id="resumen-detalle">Esperando información del archivo menu.json.</p>
         </div>
       </section>
     </section>
 
-    <!-- EDITOR -->
+    <!-- EDITOR V3 -->
     <section id="vista-editor" class="editor-view" hidden>
-      <header class="editor-header">
-        <button id="volver-inicio" class="back-button" type="button">
-          ← Volver
-        </button>
+      <header class="editor-header compact-editor-header">
+        <div class="editor-top-row">
+          <button id="volver-inicio" class="back-button" type="button">
+            ← Volver
+          </button>
 
-        <p class="eyebrow">Editor</p>
+          <span id="estado-borrador" class="draft-status" aria-live="polite">
+            Sin cambios
+          </span>
+        </div>
 
+        <p class="eyebrow">Editor V3</p>
         <h1>Editar menú</h1>
-
         <p class="intro">
-          Selecciona una fecha para consultar el menú publicado.
+          Los cambios se guardan como borrador en este dispositivo. Todavía no se publican en GitHub.
         </p>
       </header>
 
-      <section class="editor-selector-card">
+      <section class="editor-selector-card compact-selector">
         <label for="selector-fecha">Fecha publicada</label>
-
         <select id="selector-fecha">
           <option value="">Cargando fechas…</option>
         </select>
       </section>
 
       <section id="editor-contenido" class="editor-content" hidden>
-        <article class="editor-day-card">
-          <div class="editor-day-header">
+        <article class="editor-day-card editable-day-card">
+          <div class="editor-day-header compact-day-header">
             <div>
               <p class="status-label">Día seleccionado</p>
               <h2 id="editor-fecha">—</h2>
             </div>
 
-            <span class="read-only-badge">Solo lectura</span>
+            <label class="holiday-toggle" for="editor-festivo">
+              <input id="editor-festivo" type="checkbox">
+              <span class="holiday-switch" aria-hidden="true"></span>
+              <span>Festivo</span>
+            </label>
           </div>
 
-          <div class="editor-group">
-            <h3>Primeros</h3>
-            <div id="editor-primeros" class="editor-list"></div>
+          <div id="editor-campos-menu">
+            <section class="editor-group" data-category="primeros">
+              <div class="editor-group-header">
+                <h3>Primeros</h3>
+                <button class="add-item-button" type="button" data-add-category="primeros">
+                  + Añadir
+                </button>
+              </div>
+              <div id="editor-primeros" class="editor-list"></div>
+            </section>
+
+            <section class="editor-group" data-category="segundos">
+              <div class="editor-group-header">
+                <h3>Segundos</h3>
+                <button class="add-item-button" type="button" data-add-category="segundos">
+                  + Añadir
+                </button>
+              </div>
+              <div id="editor-segundos" class="editor-list"></div>
+            </section>
+
+            <section class="editor-group" data-category="dieta">
+              <div class="editor-group-header">
+                <h3>Dieta y plancha</h3>
+                <button class="add-item-button" type="button" data-add-category="dieta">
+                  + Añadir
+                </button>
+              </div>
+              <div id="editor-dieta" class="editor-list"></div>
+            </section>
           </div>
 
-          <div class="editor-group">
-            <h3>Segundos</h3>
-            <div id="editor-segundos" class="editor-list"></div>
+          <div id="editor-festivo-mensaje" class="holiday-message" hidden>
+            <span aria-hidden="true">🎉</span>
+            <div>
+              <strong>Día marcado como festivo</strong>
+              <p>No se mostrarán platos para esta fecha.</p>
+            </div>
           </div>
 
-          <div class="editor-group">
-            <h3>Dieta y plancha</h3>
-            <div id="editor-dieta" class="editor-list"></div>
+          <div class="editor-actions">
+            <button id="cancelar-cambios" class="secondary-action" type="button">
+              Cancelar cambios
+            </button>
+            <button id="guardar-borrador" class="save-draft-button" type="button" disabled>
+              Guardar borrador
+            </button>
           </div>
 
-          <p class="editor-note">
-            En el siguiente paso activaremos la edición y el guardado seguro.
+          <p id="editor-nota" class="editor-note" role="status" aria-live="polite">
+            Esta V3 guarda borradores localmente. La publicación en GitHub se añadirá después de validar el editor.
           </p>
         </article>
       </section>
@@ -169,9 +185,7 @@
         <div>
           <p class="status-label">Editor</p>
           <h2>Selecciona una fecha</h2>
-          <p>
-            El menú aparecerá aquí sin modificar todavía el archivo publicado.
-          </p>
+          <p>El menú aparecerá aquí para editarlo sin modificar todavía el archivo publicado.</p>
         </div>
       </section>
     </section>
