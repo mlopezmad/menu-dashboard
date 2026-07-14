@@ -8,6 +8,8 @@ let fechaActiva = "";
 let hayCambios = false;
 let borradorImportacion = null;
 let comparacionImportacion = null;
+let fuenteImportacion = null;
+let urlPreviewImportacion = null;
 
 function fechaDesdeClave(clave) {
   const [year, month, day] = clave.split("-").map(Number);
@@ -324,27 +326,17 @@ function crearPlantillaSemana() {
     $("ocr-progreso").className = "editor-message message-error";
     return;
   }
-  const bloques = fechasSemana(lunes).map((fecha, indice) => `${nombreDiaDesdeIndice(indice)} ${fecha}\nPRIMEROS:\n- \nSEGUNDOS:\n- \nDIETA:\n- `);
-  $("texto-ocr").value = bloques.join("\n\n");
+  pintarTextosDias(Array.from({ length: 5 }, (_, i) => `PRIMEROS:\n- \nSEGUNDOS:\n- \nDIETA:\n- `));
   $("revision-ocr").hidden = false;
   $("resultado-importacion").hidden = true;
 }
 
 function limpiarLineaOcr(linea) {
-  return linea
-    .replace(/^[•·▪◦*-]+\s*/, "")
-    .replace(/\s+/g, " ")
-    .trim();
+  return linea.replace(/^[•·▪◦*-]+\s*/, "").replace(/\s+/g, " ").trim();
 }
 
 function normalizarEncabezado(texto) {
   return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
-}
-
-function detectarDia(linea) {
-  const normal = normalizarEncabezado(linea);
-  const dias = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES"];
-  return dias.findIndex(dia => new RegExp(`(^|\\b)${dia}(\\b|$)`).test(normal));
 }
 
 function detectarSeccion(linea) {
@@ -355,94 +347,66 @@ function detectarSeccion(linea) {
   return null;
 }
 
-function parsearTextoSemana(texto, lunesClave) {
-  const fechas = fechasSemana(lunesClave);
-  const dias = Object.fromEntries(fechas.map(fecha => [fecha, { primeros: [], segundos: [], dieta: [] }]));
+function parsearTextoDia(texto) {
+  const dia = { primeros: [], segundos: [], dieta: [] };
   const lineas = texto.split(/\r?\n/).map(limpiarLineaOcr).filter(Boolean);
-  let indiceDia = -1;
   let seccion = null;
-
   for (const linea of lineas) {
-    const diaDetectado = detectarDia(linea);
-    if (diaDetectado >= 0) {
-      indiceDia = diaDetectado;
-      seccion = null;
-      continue;
-    }
-    const seccionDetectada = detectarSeccion(linea);
-    if (seccionDetectada) {
-      seccion = seccionDetectada;
+    const detectada = detectarSeccion(linea);
+    if (detectada) {
+      seccion = detectada;
       const resto = linea.replace(/^.*?:/, "").trim();
-      if (resto && resto !== linea && indiceDia >= 0) dias[fechas[indiceDia]][seccion].push(resto);
+      if (resto && resto !== linea) dia[seccion].push(resto);
       continue;
     }
-    if (indiceDia >= 0 && seccion) dias[fechas[indiceDia]][seccion].push(linea);
+    const normal = normalizarEncabezado(linea);
+    if (/^(LUNES|MARTES|MIERCOLES|JUEVES|VIERNES)\b/.test(normal)) continue;
+    if (seccion) dia[seccion].push(linea);
   }
-
-  const errores = [];
-  for (let i = 0; i < fechas.length; i++) {
-    const dia = dias[fechas[i]];
-    for (const tipo of ["primeros", "segundos", "dieta"]) {
-      dia[tipo] = dia[tipo].map(limpiarLineaOcr).filter(Boolean);
-      if (!dia[tipo].length) errores.push(`${nombreDiaDesdeIndice(i)}: falta ${tipo}.`);
-    }
+  for (const tipo of ["primeros", "segundos", "dieta"]) {
+    dia[tipo] = dia[tipo]
+      .map(limpiarLineaOcr)
+      .filter(x => x && !/^(MENU|SEMANA|MAHOU|SANMIGUEL)/i.test(x));
   }
-  return { dias, errores };
+  return dia;
 }
 
-function menusDiaIguales(a, b) {
-  return JSON.stringify(normalizarMenuDia(a)) === JSON.stringify(normalizarMenuDia(b));
+function textosDiasActuales() {
+  return Array.from(document.querySelectorAll(".ocr-day-text")).map(el => el.value);
 }
 
-function compararBorrador(borrador) {
-  const nuevos = [];
-  const iguales = [];
-  const modificados = [];
-  for (const [fecha, dia] of Object.entries(borrador.dias)) {
-    const actual = menuPublicado?.dias?.[fecha];
-    if (!actual) nuevos.push(fecha);
-    else if (menusDiaIguales(actual, dia)) iguales.push(fecha);
-    else modificados.push(fecha);
-  }
-  return { nuevos, iguales, modificados };
-}
-
-function pintarComparacion(comparacion) {
-  const detalle = $("resultado-detalle");
-  detalle.innerHTML = "";
-  const grupos = [
-    ["new", "Días nuevos", comparacion.nuevos],
-    ["same", "Ya publicados sin cambios", comparacion.iguales],
-    ["changed", "Días publicados con diferencias", comparacion.modificados]
-  ];
-  grupos.forEach(([tipo, titulo, fechas]) => {
-    const bloque = document.createElement("div");
-    bloque.className = `comparison-item comparison-${tipo}`;
-    const h = document.createElement("strong");
-    h.textContent = `${titulo}: ${fechas.length}`;
-    const p = document.createElement("p");
-    p.textContent = fechas.length ? fechas.map(f => formatearFecha(fechaDesdeClave(f))).join(" · ") : "Ninguno";
-    bloque.append(h, p);
-    detalle.appendChild(bloque);
+function pintarTextosDias(textos) {
+  const contenedor = $("ocr-dias");
+  contenedor.innerHTML = "";
+  textos.forEach((texto, indice) => {
+    const bloque = document.createElement("article");
+    bloque.className = "ocr-day-card";
+    const titulo = document.createElement("h3");
+    titulo.textContent = nombreDiaDesdeIndice(indice);
+    const area = document.createElement("textarea");
+    area.className = "ocr-text ocr-day-text";
+    area.spellcheck = true;
+    area.value = texto || "PRIMEROS:\n\nSEGUNDOS:\n\nDIETA:\n";
+    bloque.append(titulo, area);
+    contenedor.appendChild(bloque);
   });
-
-  const sinCambios = !comparacion.nuevos.length && !comparacion.modificados.length;
-  $("resultado-titulo").textContent = sinCambios ? "Esta semana ya está publicada" : "Semana preparada para revisar";
-  $("permitir-actualizaciones-wrap").hidden = !comparacion.modificados.length;
-  $("permitir-actualizaciones").checked = false;
-  $("aplicar-semana").disabled = sinCambios || comparacion.modificados.length > 0;
-  $("importador-mensaje").textContent = sinCambios
-    ? "No se han detectado cambios. La actualización queda bloqueada y no se generará ninguna publicación."
-    : comparacion.modificados.length
-      ? "Hay fechas ya publicadas con diferencias. Revisa la foto y activa la autorización solo si deseas sustituir esos días."
-      : "Los días nuevos se añadirán después de los existentes. Nada publicado será eliminado.";
-  $("importador-mensaje").className = `editor-message ${sinCambios ? "message-info" : comparacion.modificados.length ? "message-error" : "message-success"}`;
 }
 
 function prepararSemanaDesdeTexto() {
   const lunes = $("lunes-semana").value;
   if (!lunes) return window.alert("Selecciona el lunes de la semana.");
-  const { dias, errores } = parsearTextoSemana($("texto-ocr").value, lunes);
+  const fechas = fechasSemana(lunes);
+  const textos = textosDiasActuales();
+  if (textos.length !== 5) return window.alert("Primero lee la foto o crea una plantilla.");
+  const dias = {};
+  const errores = [];
+  textos.forEach((texto, i) => {
+    const dia = parsearTextoDia(texto);
+    dias[fechas[i]] = dia;
+    for (const tipo of ["primeros", "segundos", "dieta"]) {
+      if (!dia[tipo].length) errores.push(`${nombreDiaDesdeIndice(i)}: falta ${tipo}.`);
+    }
+  });
   if (errores.length) {
     $("ocr-progreso").textContent = `Revisión necesaria: ${errores.join(" ")}`;
     $("ocr-progreso").className = "editor-message message-error";
@@ -455,81 +419,177 @@ function prepararSemanaDesdeTexto() {
   $("resultado-importacion").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
+function menusDiaIguales(a, b) {
+  return JSON.stringify(normalizarMenuDia(a)) === JSON.stringify(normalizarMenuDia(b));
+}
+
+function compararBorrador(borrador) {
+  const nuevos = [], iguales = [], modificados = [];
+  for (const [fecha, dia] of Object.entries(borrador.dias)) {
+    const actual = menuPublicado?.dias?.[fecha];
+    if (!actual) nuevos.push(fecha);
+    else if (menusDiaIguales(actual, dia)) iguales.push(fecha);
+    else modificados.push(fecha);
+  }
+  return { nuevos, iguales, modificados };
+}
+
+function pintarComparacion(comparacion) {
+  const detalle = $("resultado-detalle");
+  detalle.innerHTML = "";
+  [["new", "Días nuevos", comparacion.nuevos], ["same", "Ya publicados sin cambios", comparacion.iguales], ["changed", "Días publicados con diferencias", comparacion.modificados]].forEach(([tipo, titulo, fechas]) => {
+    const bloque = document.createElement("div");
+    bloque.className = `comparison-item comparison-${tipo}`;
+    const h = document.createElement("strong"); h.textContent = `${titulo}: ${fechas.length}`;
+    const p = document.createElement("p"); p.textContent = fechas.length ? fechas.map(f => formatearFecha(fechaDesdeClave(f))).join(" · ") : "Ninguno";
+    bloque.append(h, p); detalle.appendChild(bloque);
+  });
+  const sinCambios = !comparacion.nuevos.length && !comparacion.modificados.length;
+  $("resultado-titulo").textContent = sinCambios ? "Esta semana ya está publicada" : "Semana preparada para revisar";
+  $("permitir-actualizaciones-wrap").hidden = !comparacion.modificados.length;
+  $("permitir-actualizaciones").checked = false;
+  $("aplicar-semana").disabled = sinCambios || comparacion.modificados.length > 0;
+  $("importador-mensaje").textContent = sinCambios
+    ? "No se han detectado cambios. La actualización queda bloqueada."
+    : comparacion.modificados.length
+      ? "Hay fechas publicadas con diferencias. Activa la autorización únicamente si son cambios reales."
+      : "Los días nuevos se añadirán sin eliminar nada publicado.";
+  $("importador-mensaje").className = `editor-message ${sinCambios ? "message-info" : comparacion.modificados.length ? "message-error" : "message-success"}`;
+}
+
 function aplicarSemanaAlEditor() {
   if (!borradorImportacion || !comparacionImportacion) return;
   if (comparacionImportacion.modificados.length && !$("permitir-actualizaciones").checked) return;
-  if (comparacionImportacion.modificados.length && !window.confirm("Vas a sustituir días que ya estaban publicados. ¿Continuar con la revisión?")) return;
-
+  if (comparacionImportacion.modificados.length && !window.confirm("Vas a sustituir días ya publicados. ¿Continuar?")) return;
   const fechasAplicadas = [];
   for (const [fecha, dia] of Object.entries(borradorImportacion.dias)) {
     const existe = Boolean(menuTrabajo.dias[fecha]);
-    if (!existe || $("permitir-actualizaciones").checked) {
-      menuTrabajo.dias[fecha] = clonar(dia);
-      fechasAplicadas.push(fecha);
-    }
+    if (!existe || $("permitir-actualizaciones").checked) { menuTrabajo.dias[fecha] = clonar(dia); fechasAplicadas.push(fecha); }
   }
   if (!fechasAplicadas.length) return;
   fechaActiva = fechasAplicadas.sort()[0];
   cargarSelectorFechas(menuTrabajo, fechaActiva);
-  cambiarVista("vista-editor");
-  mostrarMenuDeFecha(fechaActiva);
-  actualizarEstadoCambios();
-  mostrarMensaje(`Semana incorporada como borrador. Revisa los ${fechasAplicadas.length} días y pulsa Publicar cambios cuando esté correcto.`, "success");
+  cambiarVista("vista-editor"); mostrarMenuDeFecha(fechaActiva); actualizarEstadoCambios();
+  mostrarMensaje(`Semana incorporada como borrador. Revisa los ${fechasAplicadas.length} días antes de publicar.`, "success");
+}
+
+async function cargarFuenteImagen(archivo) {
+  const esPdf = archivo.type === "application/pdf" || archivo.name.toLowerCase().endsWith(".pdf");
+  if (esPdf) {
+    if (!window.pdfjsLib) throw new Error("No se pudo cargar el lector de PDF.");
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
+    const pdf = await window.pdfjsLib.getDocument({ data: await archivo.arrayBuffer() }).promise;
+    const pagina = await pdf.getPage(1);
+    const viewport = pagina.getViewport({ scale: 2.4 });
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.ceil(viewport.width); canvas.height = Math.ceil(viewport.height);
+    await pagina.render({ canvasContext: canvas.getContext("2d", { alpha: false }), viewport }).promise;
+    return canvas;
+  }
+  const bitmap = await createImageBitmap(archivo);
+  const canvas = document.createElement("canvas");
+  const max = 2200;
+  const escala = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
+  canvas.width = Math.round(bitmap.width * escala); canvas.height = Math.round(bitmap.height * escala);
+  canvas.getContext("2d", { alpha: false }).drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close?.();
+  return canvas;
+}
+
+function valoresRecorte() {
+  let top = Number($("crop-top").value), bottom = Number($("crop-bottom").value), left = Number($("crop-left").value), right = Number($("crop-right").value);
+  if (bottom <= top + 8) bottom = top + 8;
+  if (right <= left + 20) right = left + 20;
+  return { top: top / 100, bottom: Math.min(bottom, 100) / 100, left: left / 100, right: Math.min(right, 100) / 100 };
+}
+
+function dibujarPreviewRecorte() {
+  if (!fuenteImportacion) return;
+  const preview = $("recorte-preview");
+  const ctx = preview.getContext("2d");
+  const maxW = 900;
+  const escala = Math.min(1, maxW / fuenteImportacion.width);
+  preview.width = Math.round(fuenteImportacion.width * escala);
+  preview.height = Math.round(fuenteImportacion.height * escala);
+  ctx.drawImage(fuenteImportacion, 0, 0, preview.width, preview.height);
+  const r = valoresRecorte();
+  const x = r.left * preview.width, y = r.top * preview.height, w = (r.right-r.left)*preview.width, h = (r.bottom-r.top)*preview.height;
+  ctx.fillStyle = "rgba(0,0,0,.48)";
+  ctx.fillRect(0,0,preview.width,y); ctx.fillRect(0,y,x,h); ctx.fillRect(x+w,y,preview.width-x-w,h); ctx.fillRect(0,y+h,preview.width,preview.height-y-h);
+  ctx.strokeStyle = "#e30613"; ctx.lineWidth = Math.max(3, preview.width/250); ctx.strokeRect(x,y,w,h);
+  ctx.strokeStyle = "rgba(227,6,19,.65)"; ctx.lineWidth = 2;
+  for (let i=1;i<5;i++) { const xx=x+w*i/5; ctx.beginPath(); ctx.moveTo(xx,y); ctx.lineTo(xx,y+h); ctx.stroke(); }
+}
+
+function crearCanvasColumna(indice) {
+  const r = valoresRecorte();
+  const sx = fuenteImportacion.width * (r.left + (r.right-r.left)*indice/5);
+  const sy = fuenteImportacion.height * r.top;
+  const sw = fuenteImportacion.width * (r.right-r.left)/5;
+  const sh = fuenteImportacion.height * (r.bottom-r.top);
+  const escala = Math.max(2.2, 1500 / sw);
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(sw * escala); canvas.height = Math.round(sh * escala);
+  const ctx = canvas.getContext("2d", { alpha: false, willReadFrequently: true });
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(fuenteImportacion, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+  const image = ctx.getImageData(0,0,canvas.width,canvas.height); const d=image.data;
+  for (let i=0;i<d.length;i+=4) {
+    const g = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
+    const c = g > 205 ? 255 : g < 80 ? 0 : Math.max(0, Math.min(255, (g-128)*1.7+128));
+    d[i]=d[i+1]=d[i+2]=c;
+  }
+  ctx.putImageData(image,0,0);
+  return canvas;
 }
 
 async function leerFotoConOcr() {
   const archivo = $("foto-menu").files?.[0];
-  if (!archivo) return;
-  if (!window.Tesseract) {
-    $("ocr-progreso").textContent = "No se pudo cargar el lector OCR gratuito. Comprueba la conexión e inténtalo de nuevo.";
-    $("ocr-progreso").className = "editor-message message-error";
-    return;
-  }
-  const boton = $("leer-foto");
-  boton.disabled = true;
-  boton.textContent = "Leyendo…";
-  $("ocr-progreso").textContent = "Preparando la imagen…";
-  $("ocr-progreso").className = "editor-message message-info";
+  if (!archivo || !fuenteImportacion) return;
+  if (!window.Tesseract) return window.alert("No se pudo cargar el OCR gratuito.");
+  const lunes = $("lunes-semana").value;
+  if (!lunes) return window.alert("Selecciona el lunes de la semana.");
+  const boton=$("leer-foto"); boton.disabled=true; boton.textContent="Leyendo 1/5…";
+  $("ocr-progreso").className="editor-message message-info";
+  let worker;
   try {
-    const resultado = await Tesseract.recognize(archivo, "spa", {
-      logger: progreso => {
-        if (progreso.status === "recognizing text") {
-          const porcentaje = Math.round((progreso.progress || 0) * 100);
-          $("ocr-progreso").textContent = `Leyendo texto… ${porcentaje}%`;
-        }
-      }
-    });
-    $("texto-ocr").value = resultado?.data?.text?.trim() || "";
-    $("revision-ocr").hidden = false;
-    $("resultado-importacion").hidden = true;
-    $("ocr-progreso").textContent = "Lectura terminada. Corrige el texto y prepara la semana.";
-    $("ocr-progreso").className = "editor-message message-success";
-    $("revision-ocr").scrollIntoView({ behavior: "smooth", block: "start" });
-  } catch (error) {
+    worker = await Tesseract.createWorker("spa", 1, { logger: p => {
+      if (p.status === "recognizing text") $("ocr-progreso").textContent = `OCR por columnas… ${Math.round((p.progress||0)*100)}%`;
+    }});
+    const textos=[];
+    for (let i=0;i<5;i++) {
+      boton.textContent=`Leyendo ${i+1}/5…`;
+      $("ocr-progreso").textContent=`Leyendo ${nombreDiaDesdeIndice(i).toLowerCase()}…`;
+      const { data } = await worker.recognize(crearCanvasColumna(i));
+      textos.push((data?.text||"").trim());
+    }
+    pintarTextosDias(textos);
+    $("revision-ocr").hidden=false; $("resultado-importacion").hidden=true;
+    $("ocr-progreso").textContent="Lectura por días terminada. Revisa cada columna.";
+    $("ocr-progreso").className="editor-message message-success";
+    $("revision-ocr").scrollIntoView({behavior:"smooth",block:"start"});
+  } catch(error) {
     console.error(error);
-    $("ocr-progreso").textContent = "No se pudo leer la foto. Prueba con una imagen más nítida o usa Crear plantilla para introducir la semana manualmente.";
-    $("ocr-progreso").className = "editor-message message-error";
+    $("ocr-progreso").textContent="No se pudo completar el OCR. Ajusta el recorte o crea una plantilla manual.";
+    $("ocr-progreso").className="editor-message message-error";
   } finally {
-    boton.disabled = false;
-    boton.textContent = "Leer foto";
+    await worker?.terminate?.(); boton.disabled=false; boton.textContent="Leer 5 días";
   }
 }
 
-function fotoSeleccionada() {
-  const archivo = $("foto-menu").files?.[0];
-  $("leer-foto").disabled = !archivo;
-  const preview = $("foto-preview");
-  if (!archivo) {
-    preview.hidden = true;
-    preview.removeAttribute("src");
-    return;
+async function fotoSeleccionada() {
+  const archivo=$("foto-menu").files?.[0];
+  $("leer-foto").disabled=!archivo; $("revision-ocr").hidden=true; $("resultado-importacion").hidden=true;
+  if (!archivo) { fuenteImportacion=null; $("recorte-panel").hidden=true; return; }
+  $("ocr-progreso").textContent="Preparando vista previa…"; $("ocr-progreso").className="editor-message message-info";
+  try {
+    fuenteImportacion=await cargarFuenteImagen(archivo);
+    $("recorte-panel").hidden=false; dibujarPreviewRecorte();
+    $("ocr-progreso").textContent="Ajusta el marco a la tabla y pulsa Leer 5 días.";
+  } catch(error) {
+    console.error(error); fuenteImportacion=null; $("leer-foto").disabled=true;
+    $("ocr-progreso").textContent="No se pudo preparar el archivo."; $("ocr-progreso").className="editor-message message-error";
   }
-  preview.src = URL.createObjectURL(archivo);
-  preview.hidden = false;
-  $("revision-ocr").hidden = true;
-  $("resultado-importacion").hidden = true;
-  $("ocr-progreso").textContent = "Foto lista. Pulsa Leer foto.";
-  $("ocr-progreso").className = "editor-message message-info";
 }
 
 async function cerrarSesion() {
@@ -550,6 +610,7 @@ function prepararEventos() {
   $("abrir-importador").addEventListener("click", abrirImportador);
   $("volver-importador").addEventListener("click", volverDesdeImportador);
   $("foto-menu").addEventListener("change", fotoSeleccionada);
+  ["crop-top", "crop-bottom", "crop-left", "crop-right"].forEach(id => $(id).addEventListener("input", dibujarPreviewRecorte));
   $("leer-foto").addEventListener("click", leerFotoConOcr);
   $("plantilla-semana").addEventListener("click", crearPlantillaSemana);
   $("preparar-semana").addEventListener("click", prepararSemanaDesdeTexto);
