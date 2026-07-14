@@ -10,6 +10,7 @@ let borradorImportacion = null;
 let comparacionImportacion = null;
 let fuenteImportacion = null;
 let urlPreviewImportacion = null;
+let limitesFilasDetectados = null;
 
 function fechaDesdeClave(clave) {
   const [year, month, day] = clave.split("-").map(Number);
@@ -632,6 +633,7 @@ function valoresRecorte() {
 
 function dibujarPreviewRecorte() {
   if (!fuenteImportacion) return;
+  limitesFilasDetectados = null;
   const preview = $("recorte-preview");
   const ctx = preview.getContext("2d");
   const maxW = 900;
@@ -648,42 +650,94 @@ function dibujarPreviewRecorte() {
   for (let i=1;i<5;i++) { const xx=x+w*i/5; ctx.beginPath(); ctx.moveTo(xx,y); ctx.lineTo(xx,y+h); ctx.stroke(); }
 }
 
+function detectarLimitesFilasTabla() {
+  if (!fuenteImportacion) return null;
+  const r = valoresRecorte();
+  const sx = Math.round(fuenteImportacion.width * r.left);
+  const sy = Math.round(fuenteImportacion.height * r.top);
+  const sw = Math.max(1, Math.round(fuenteImportacion.width * (r.right - r.left)));
+  const sh = Math.max(1, Math.round(fuenteImportacion.height * (r.bottom - r.top)));
+
+  const escala = Math.min(1, 1100 / sw);
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(500, Math.round(sw * escala));
+  canvas.height = Math.max(220, Math.round(sh * escala));
+  const ctx = canvas.getContext("2d", { alpha: false, willReadFrequently: true });
+  ctx.drawImage(fuenteImportacion, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+  const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const puntuaciones = new Array(canvas.height).fill(0);
+  const x0 = Math.round(canvas.width * 0.015);
+  const x1 = Math.round(canvas.width * 0.985);
+
+  for (let y = 0; y < canvas.height; y++) {
+    let oscuros = 0;
+    for (let x = x0; x < x1; x++) {
+      const i = (y * canvas.width + x) * 4;
+      const gris = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+      if (gris < 155) oscuros++;
+    }
+    puntuaciones[y] = oscuros / Math.max(1, x1 - x0);
+  }
+
+  const suavizadas = puntuaciones.map((_, y) => {
+    let suma = 0, n = 0;
+    for (let k = -2; k <= 2; k++) {
+      if (puntuaciones[y + k] != null) { suma += puntuaciones[y + k]; n++; }
+    }
+    return suma / n;
+  });
+
+  // Posiciones aproximadas de las diez líneas que delimitan:
+  // días, PRIMEROS, 3 platos, SEGUNDOS y 3 platos.
+  const esperadas = [0.0, 0.075, 0.145, 0.275, 0.405, 0.535, 0.605, 0.735, 0.865, 1.0];
+  const limites = esperadas.map((esperada, indice) => {
+    if (indice === 0) return 0;
+    if (indice === esperadas.length - 1) return 1;
+    const radio = indice === 5 || indice === 6 ? 0.05 : 0.045;
+    const desde = Math.max(1, Math.floor((esperada - radio) * canvas.height));
+    const hasta = Math.min(canvas.height - 2, Math.ceil((esperada + radio) * canvas.height));
+    let mejorY = Math.round(esperada * canvas.height), mejor = -1;
+    for (let y = desde; y <= hasta; y++) {
+      // Las líneas reales atraviesan casi todo el ancho; el texto no.
+      const valor = suavizadas[y];
+      if (valor > mejor) { mejor = valor; mejorY = y; }
+    }
+    return mejor >= 0.13 ? mejorY / canvas.height : esperada;
+  });
+
+  // Evita límites cruzados si la foto tiene sombras o mucho ruido.
+  for (let i = 1; i < limites.length; i++) {
+    const minimo = limites[i - 1] + 0.035;
+    if (limites[i] < minimo) limites[i] = Math.min(1, minimo);
+  }
+  limites[0] = 0;
+  limites[limites.length - 1] = 1;
+  return limites;
+}
+
 function crearCanvasCelda(indiceDia, indicePlato) {
   const r = valoresRecorte();
   const anchoTabla = fuenteImportacion.width * (r.right - r.left);
   const altoTabla = fuenteImportacion.height * (r.bottom - r.top);
   const anchoColumna = anchoTabla / 5;
+  const limites = limitesFilasDetectados || detectarLimitesFilasTabla();
+  const filasPlatos = [[2,3], [3,4], [4,5], [6,7], [7,8], [8,9]];
+  const [inicio, fin] = filasPlatos[indicePlato];
+  const inicioY = limites?.[inicio] ?? [0.145,0.275,0.405,0.605,0.735,0.865][indicePlato];
+  const finY = limites?.[fin] ?? [0.275,0.405,0.535,0.735,0.865,1][indicePlato];
 
-  // El recorte comprende: cabecera del día, PRIMEROS, 3 platos,
-  // SEGUNDOS y 3 platos. Solo leemos las seis filas de comida.
-  const franjas = [
-    [0.135, 0.270], // primer 1
-    [0.270, 0.400], // primer 2
-    [0.400, 0.530], // primer 3
-    [0.595, 0.730], // segundo 1
-    [0.730, 0.865], // segundo 2
-    [0.865, 0.995]  // segundo 3
-  ];
-  const [inicioY, finY] = franjas[indicePlato];
-
-  // Recortamos los bordes de la celda: ahí suelen estar las líneas
-  // de la tabla y buena parte de los iconos de alérgenos.
-  const margenIzquierdo = 0.055;
-  const margenDerecho = 0.075;
-  const margenVertical = 0.12;
-  const sx = fuenteImportacion.width * r.left
-    + anchoColumna * indiceDia
-    + anchoColumna * margenIzquierdo;
-  const sy = fuenteImportacion.height * r.top
-    + altoTabla * inicioY
-    + altoTabla * (finY - inicioY) * margenVertical;
+  const margenIzquierdo = 0.035;
+  const margenDerecho = 0.085;
+  const margenVertical = 0.10;
+  const sx = fuenteImportacion.width * r.left + anchoColumna * indiceDia + anchoColumna * margenIzquierdo;
+  const sy = fuenteImportacion.height * r.top + altoTabla * inicioY + altoTabla * (finY - inicioY) * margenVertical;
   const sw = anchoColumna * (1 - margenIzquierdo - margenDerecho);
   const sh = altoTabla * (finY - inicioY) * (1 - margenVertical * 2);
 
-  const escala = Math.max(3.2, 1250 / Math.max(sw, 1));
+  const escala = Math.max(3.5, 1350 / Math.max(sw, 1));
   const canvas = document.createElement("canvas");
-  canvas.width = Math.max(600, Math.round(sw * escala));
-  canvas.height = Math.max(150, Math.round(sh * escala));
+  canvas.width = Math.max(650, Math.round(sw * escala));
+  canvas.height = Math.max(170, Math.round(sh * escala));
   const ctx = canvas.getContext("2d", { alpha: false, willReadFrequently: true });
   ctx.fillStyle = "#fff";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -691,17 +745,12 @@ function crearCanvasCelda(indiceDia, indicePlato) {
   ctx.imageSmoothingQuality = "high";
   ctx.drawImage(fuenteImportacion, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
 
-  // Escala de grises, contraste y binarización suave. El objetivo es
-  // conservar letras finas y reducir líneas/iconos de la tabla.
   const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const d = image.data;
   let suma = 0;
-  for (let i = 0; i < d.length; i += 4) {
-    const g = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-    suma += g;
-  }
+  for (let i = 0; i < d.length; i += 4) suma += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
   const media = suma / (d.length / 4);
-  const umbral = Math.max(135, Math.min(205, media - 24));
+  const umbral = Math.max(145, Math.min(210, media - 20));
   for (let i = 0; i < d.length; i += 4) {
     const g = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
     const c = g > umbral ? 255 : 0;
@@ -757,6 +806,9 @@ async function leerFotoConOcr() {
       preserve_interword_spaces: "1"
     });
 
+    limitesFilasDetectados = detectarLimitesFilasTabla();
+    $("ocr-progreso").textContent = limitesFilasDetectados ? "Líneas de la tabla detectadas. Iniciando lectura…" : "Usando división de respaldo…";
+
     const dias = Array.from({ length: 5 }, () => ({
       primeros: ["", "", ""],
       segundos: ["", "", ""],
@@ -799,12 +851,12 @@ async function leerFotoConOcr() {
 async function fotoSeleccionada() {
   const archivo=$("foto-menu").files?.[0];
   $("leer-foto").disabled=!archivo; $("revision-ocr").hidden=true; $("resultado-importacion").hidden=true;
-  if (!archivo) { fuenteImportacion=null; $("recorte-panel").hidden=true; return; }
+  if (!archivo) { fuenteImportacion=null; limitesFilasDetectados=null; $("recorte-panel").hidden=true; return; }
   $("ocr-progreso").textContent="Preparando vista previa…"; $("ocr-progreso").className="editor-message message-info";
   try {
-    fuenteImportacion=await cargarFuenteImagen(archivo);
+    fuenteImportacion=await cargarFuenteImagen(archivo); limitesFilasDetectados=null;
     $("recorte-panel").hidden=false; dibujarPreviewRecorte();
-    $("ocr-progreso").textContent="Ajusta el marco a la tabla y pulsa Leer 5 días.";
+    $("ocr-progreso").textContent="Ajusta el marco a la tabla y pulsa Leer 30 celdas.";
   } catch(error) {
     console.error(error); fuenteImportacion=null; $("leer-foto").disabled=true;
     $("ocr-progreso").textContent="No se pudo preparar el archivo."; $("ocr-progreso").className="editor-message message-error";
