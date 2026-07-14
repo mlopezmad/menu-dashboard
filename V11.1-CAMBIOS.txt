@@ -1,0 +1,7 @@
+MENÚ DASHBOARD · V11.1
+
+- Dashboard agrupado por semanas publicadas.
+- Acceso directo desde cada semana al primer día de esa semana.
+- Imagen original integrada en el editor durante el borrador importado.
+- Vista ampliada con zoom y desplazamiento.
+- Mantiene sin cambios OCR, calibración, comparación y publicación.

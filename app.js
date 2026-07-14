@@ -10,6 +10,8 @@ let borradorImportacion = null;
 let comparacionImportacion = null;
 let fuenteImportacion = null;
 let urlPreviewImportacion = null;
+let imagenReferenciaImportacion = null;
+let fechasReferenciaImportacion = new Set();
 let revisionGuiadaActiva = false;
 let campoRevisionActivo = null;
 let limitesFilasDetectados = null;
@@ -40,17 +42,62 @@ function mostrarMensaje(texto = "", tipo = "") {
   el.className = `editor-message${tipo ? ` message-${tipo}` : ""}`;
 }
 
+function agruparSemanasPublicadas(dias) {
+  const grupos = new Map();
+  for (const clave of Object.keys(dias || {}).sort()) {
+    const fecha = fechaDesdeClave(clave);
+    const lunes = new Date(fecha);
+    const dia = (lunes.getDay() + 6) % 7;
+    lunes.setDate(lunes.getDate() - dia);
+    const claveLunes = claveFechaLocal(lunes);
+    if (!grupos.has(claveLunes)) grupos.set(claveLunes, []);
+    grupos.get(claveLunes).push(clave);
+  }
+  return [...grupos.entries()].map(([lunes, fechas]) => ({ lunes, fechas: fechas.sort() })).sort((a,b) => b.lunes.localeCompare(a.lunes));
+}
+
+function formatoRangoSemana(fechas) {
+  const inicio = fechaDesdeClave(fechas[0]);
+  const fin = fechaDesdeClave(fechas.at(-1));
+  const mismoMes = inicio.getMonth() === fin.getMonth() && inicio.getFullYear() === fin.getFullYear();
+  const mesFin = new Intl.DateTimeFormat("es-ES", { month: "long", year: "numeric" }).format(fin);
+  if (mismoMes) return `${inicio.getDate()}–${fin.getDate()} ${mesFin}`;
+  const ini = new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short" }).format(inicio);
+  const fi = new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short", year: "numeric" }).format(fin);
+  return `${ini}–${fi}`;
+}
+
+function abrirSemanaDesdeResumen(fecha) {
+  cambiarVista("vista-editor");
+  $("selector-fecha").value = fecha;
+  mostrarMenuDeFecha(fecha);
+}
+
 function mostrarResumen(datos) {
   const dias = datos?.dias || {};
   const fechas = Object.keys(dias).sort();
+  const lista = $("resumen-semanas");
+  lista.innerHTML = "";
   if (!fechas.length) {
     $("resumen-titulo").textContent = "No hay días publicados";
     $("resumen-detalle").textContent = "El archivo menu.json no contiene menús.";
+    lista.hidden = true;
     return;
   }
   const festivos = fechas.filter(clave => dias[clave]?.festivo).length;
-  $("resumen-titulo").textContent = `${fechas.length - festivos} días con menú publicados`;
+  const semanas = agruparSemanasPublicadas(dias);
+  $("resumen-titulo").textContent = `${semanas.length} ${semanas.length === 1 ? "semana" : "semanas"} · ${fechas.length - festivos} días`;
   $("resumen-detalle").textContent = `Desde ${formatearFecha(fechaDesdeClave(fechas[0]))} hasta ${formatearFecha(fechaDesdeClave(fechas.at(-1)))}.${festivos ? ` Incluye ${festivos} ${festivos === 1 ? "festivo" : "festivos"}.` : ""}`;
+  semanas.forEach(semana => {
+    const boton = document.createElement("button");
+    boton.type = "button";
+    boton.className = "week-row";
+    const festivosSemana = semana.fechas.filter(f => dias[f]?.festivo).length;
+    boton.innerHTML = `<span><strong>${formatoRangoSemana(semana.fechas)}</strong><small>${semana.fechas.length - festivosSemana} días publicados${festivosSemana ? ` · ${festivosSemana} festivo${festivosSemana === 1 ? "" : "s"}` : ""}</small></span><span class="week-arrow">›</span>`;
+    boton.addEventListener("click", () => abrirSemanaDesdeResumen(semana.fechas[0]));
+    lista.appendChild(boton);
+  });
+  lista.hidden = false;
 }
 
 function cargarSelectorFechas(datos, seleccionar = fechaActiva) {
@@ -123,6 +170,7 @@ function mostrarMenuDeFecha(clave) {
   pintarLista("segundos", menu.segundos);
   pintarLista("dieta", menu.dieta);
   actualizarFestivoUI();
+  actualizarReferenciaEditor();
   mostrarMensaje();
   $("editor-vacio").hidden = true;
   $("editor-contenido").hidden = false;
@@ -967,10 +1015,45 @@ function aplicarSemanaAlEditor() {
     if (!existe || $("permitir-actualizaciones").checked) { menuTrabajo.dias[fecha] = clonar(dia); fechasAplicadas.push(fecha); }
   }
   if (!fechasAplicadas.length) return;
+  fechasReferenciaImportacion = new Set(fechasAplicadas);
   fechaActiva = fechasAplicadas.sort()[0];
   cargarSelectorFechas(menuTrabajo, fechaActiva);
   cambiarVista("vista-editor"); mostrarMenuDeFecha(fechaActiva); actualizarEstadoCambios();
   mostrarMensaje(`Semana incorporada como borrador. Revisa los ${fechasAplicadas.length} días antes de publicar.`, "success");
+}
+
+function prepararImagenReferencia() {
+  if (!fuenteImportacion) return;
+  try {
+    const max = 1800;
+    const escala = Math.min(1, max / Math.max(fuenteImportacion.width, fuenteImportacion.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(fuenteImportacion.width * escala));
+    canvas.height = Math.max(1, Math.round(fuenteImportacion.height * escala));
+    canvas.getContext("2d", { alpha: false }).drawImage(fuenteImportacion, 0, 0, canvas.width, canvas.height);
+    imagenReferenciaImportacion = canvas.toDataURL("image/jpeg", 0.86);
+  } catch { imagenReferenciaImportacion = null; }
+}
+
+function actualizarReferenciaEditor() {
+  const panel = $("editor-referencia");
+  const disponible = Boolean(imagenReferenciaImportacion && fechasReferenciaImportacion.has(fechaActiva));
+  panel.hidden = !disponible;
+  if (!disponible) return;
+  $("editor-referencia-img").src = imagenReferenciaImportacion;
+  $("reference-dialog-img").src = imagenReferenciaImportacion;
+}
+
+function abrirReferencia() {
+  if (!imagenReferenciaImportacion) return;
+  const dialogo = $("reference-dialog");
+  $("reference-dialog-img").src = imagenReferenciaImportacion;
+  dialogo.showModal();
+}
+
+function cerrarReferencia() {
+  const dialogo = $("reference-dialog");
+  if (dialogo.open) dialogo.close();
 }
 
 async function cargarFuenteImagen(archivo) {
@@ -1348,10 +1431,12 @@ async function leerFotoConOcr() {
 async function fotoSeleccionada() {
   const archivo=$("foto-menu").files?.[0];
   $("leer-foto").disabled=!archivo; $("revision-ocr").hidden=true; $("resultado-importacion").hidden=true;
-  if (!archivo) { fuenteImportacion=null; limitesFilasDetectados=null; $("recorte-panel").hidden=true; return; }
+  if (!archivo) { fuenteImportacion=null; imagenReferenciaImportacion=null; fechasReferenciaImportacion = new Set(); limitesFilasDetectados=null; $("recorte-panel").hidden=true; return; }
   $("ocr-progreso").textContent="Preparando vista previa…"; $("ocr-progreso").className="editor-message message-info";
   try {
     fuenteImportacion=await cargarFuenteImagen(archivo); limitesFilasDetectados=null;
+    prepararImagenReferencia();
+    fechasReferenciaImportacion = new Set();
     $("recorte-panel").hidden=false; cargarCalibracionGuardada(); dibujarPreviewRecorte();
     $("ocr-progreso").textContent="Ajusta el marco a la tabla y pulsa Leer 30 celdas.";
   } catch(error) {
@@ -1407,6 +1492,9 @@ function prepararEventos() {
   $("descartar-cambios").addEventListener("click", descartarCambios);
   $("eliminar-fecha").addEventListener("click", eliminarFecha);
   $("publicar-menu").addEventListener("click", publicarMenu);
+  $("ampliar-referencia").addEventListener("click", abrirReferencia);
+  $("cerrar-referencia").addEventListener("click", cerrarReferencia);
+  $("reference-dialog").addEventListener("click", event => { if (event.target === $("reference-dialog")) cerrarReferencia(); });
   window.addEventListener("beforeunload", event => { if (hayCambios) { event.preventDefault(); event.returnValue = ""; } });
 }
 

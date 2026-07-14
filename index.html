@@ -26,7 +26,7 @@
 
     <section id="vista-inicio">
       <header class="dashboard-header">
-        <p class="eyebrow">Menú comedor · V11</p>
+        <p class="eyebrow">Menú comedor · V11.1</p>
         <h1>Gestor del menú</h1>
         <p class="intro">Actualiza, revisa y publica el menú semanal desde el móvil.</p>
       </header>
@@ -61,6 +61,7 @@
           <p class="status-label">Menú publicado</p>
           <h2 id="resumen-titulo">Cargando fechas…</h2>
           <p id="resumen-detalle">Esperando información del archivo menu.json.</p>
+          <div id="resumen-semanas" class="weeks-list" hidden></div>
         </div>
       </section>
     </section>
@@ -69,7 +70,7 @@
     <section id="vista-importador" class="editor-view" hidden>
       <header class="editor-header">
         <button id="volver-importador" class="back-button" type="button">← Volver</button>
-        <p class="eyebrow">Importador · V11</p>
+        <p class="eyebrow">Importador · V11.1</p>
         <h1>Subir menú semanal</h1>
         <p class="intro">Selecciona una foto o un PDF, ajusta el recorte y lee cada día por separado sin borrar los días publicados.</p>
       </header>
@@ -182,7 +183,7 @@
     <section id="vista-editor" class="editor-view" hidden>
       <header class="editor-header">
         <button id="volver-inicio" class="back-button" type="button">← Volver</button>
-        <p class="eyebrow">Editor · V11</p>
+        <p class="eyebrow">Editor · V11.1</p>
         <h1>Editar menú</h1>
         <p class="intro">Selecciona una fecha, modifica los platos y publica cuando esté revisado.</p>
       </header>
@@ -212,6 +213,21 @@
             </div>
             <span id="cambios-badge" class="read-only-badge">Sin cambios</span>
           </div>
+
+
+          <section id="editor-referencia" class="reference-card" hidden>
+            <div class="reference-heading">
+              <div>
+                <p class="status-label">Menú original</p>
+                <h3>Comprueba el día sin salir del editor</h3>
+              </div>
+              <button id="ampliar-referencia" class="secondary-action" type="button">Ampliar</button>
+            </div>
+            <div class="reference-viewport">
+              <img id="editor-referencia-img" alt="Foto original del menú importado">
+            </div>
+            <p class="file-help">La imagen se conserva durante este borrador. Puedes ampliar y mover para comparar los platos.</p>
+          </section>
 
           <label class="festivo-toggle">
             <input id="editor-festivo" type="checkbox">
@@ -256,6 +272,12 @@
       </section>
     </section>
   </main>
+  <dialog id="reference-dialog" class="reference-dialog">
+    <button id="cerrar-referencia" class="reference-close" type="button" aria-label="Cerrar imagen">×</button>
+    <div class="reference-dialog-stage">
+      <img id="reference-dialog-img" alt="Menú original ampliado">
+    </div>
+  </dialog>
   <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script src="app.js"></script>
