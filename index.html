@@ -26,7 +26,7 @@
 
     <section id="vista-inicio">
       <header class="dashboard-header">
-        <p class="eyebrow">Menú comedor · V5.1</p>
+        <p class="eyebrow">Menú comedor · V6</p>
         <h1>Gestor del menú</h1>
         <p class="intro">Actualiza, revisa y publica el menú semanal desde el móvil.</p>
       </header>
@@ -69,9 +69,9 @@
     <section id="vista-importador" class="editor-view" hidden>
       <header class="editor-header">
         <button id="volver-importador" class="back-button" type="button">← Volver</button>
-        <p class="eyebrow">Calibración · V5.1</p>
-        <h1>Calibrar lectura semanal</h1>
-        <p class="intro">Primero dejamos perfectos los 30 recortes. En esta fase no se hace OCR ni se publica nada.</p>
+        <p class="eyebrow">Importador · V6</p>
+        <h1>Subir menú semanal</h1>
+        <p class="intro">Selecciona una foto o un PDF, ajusta el recorte y lee cada día por separado sin borrar los días publicados.</p>
       </header>
 
       <section class="editor-selector-card import-card">
@@ -79,67 +79,110 @@
           <div>
             <label for="foto-menu">Foto o PDF del menú</label>
             <input id="foto-menu" type="file" accept="image/*,application/pdf,.pdf">
-            <small class="file-help">Puedes elegir Cámara, Fototeca o Archivos.</small>
+            <small class="file-help">Puedes elegir Cámara, Fototeca o Archivos en el iPhone.</small>
+          </div>
+          <div>
+            <label for="lunes-semana">Lunes de la semana</label>
+            <input id="lunes-semana" type="date">
           </div>
         </div>
-
         <div id="recorte-panel" class="crop-panel" hidden>
-          <p class="status-label">Paso 1 · Marco exterior</p>
-          <h3>Deja dentro únicamente las seis filas de platos</h3>
-          <canvas id="recorte-preview" class="crop-preview" aria-label="Vista previa de la calibración"></canvas>
+          <p class="status-label">Ajustar tabla</p>
+          <h3>Deja dentro del marco solo PRIMEROS y SEGUNDOS</h3>
+          <canvas id="recorte-preview" class="crop-preview" aria-label="Vista previa del recorte"></canvas>
           <div class="crop-controls">
-            <label>Arriba <input id="crop-top" type="range" min="0" max="70" value="22"></label>
-            <label>Abajo <input id="crop-bottom" type="range" min="30" max="100" value="69"></label>
+            <label>Arriba <input id="crop-top" type="range" min="0" max="60" value="18"></label>
+            <label>Abajo <input id="crop-bottom" type="range" min="35" max="90" value="65"></label>
             <label>Izquierda <input id="crop-left" type="range" min="0" max="35" value="7"></label>
             <label>Derecha <input id="crop-right" type="range" min="65" max="100" value="93"></label>
           </div>
 
-          <div class="calibration-block">
+          <div id="calibracion-panel" class="calibration-panel">
             <div class="calibration-heading">
               <div>
-                <p class="status-label">Paso 2 · Rejilla</p>
-                <h3>Ajusta las separaciones a las líneas reales</h3>
+                <p class="status-label">Calibración visual</p>
+                <h3>Ajusta la rejilla viendo siempre la imagen</h3>
               </div>
-              <button id="restaurar-calibracion" class="secondary-action" type="button">Restaurar</button>
+              <span id="calibracion-estado" class="read-only-badge">Sin guardar</span>
             </div>
-            <div class="calibration-grid-controls">
-              <div>
-                <h4>Columnas</h4>
-                <label>Límite 1 <input class="grid-slider grid-x" data-index="1" type="range" min="10" max="30" value="20"></label>
-                <label>Límite 2 <input class="grid-slider grid-x" data-index="2" type="range" min="28" max="50" value="40"></label>
-                <label>Límite 3 <input class="grid-slider grid-x" data-index="3" type="range" min="48" max="70" value="60"></label>
-                <label>Límite 4 <input class="grid-slider grid-x" data-index="4" type="range" min="68" max="90" value="80"></label>
-              </div>
-              <div>
-                <h4>Filas</h4>
-                <label>Límite 1 <input class="grid-slider grid-y" data-index="1" type="range" min="8" max="27" value="17"></label>
-                <label>Límite 2 <input class="grid-slider grid-y" data-index="2" type="range" min="20" max="43" value="33"></label>
-                <label>Límite 3 <input class="grid-slider grid-y" data-index="3" type="range" min="36" max="58" value="50"></label>
-                <label>Límite 4 <input class="grid-slider grid-y" data-index="4" type="range" min="52" max="75" value="67"></label>
-                <label>Límite 5 <input class="grid-slider grid-y" data-index="5" type="range" min="69" max="92" value="83"></label>
-              </div>
+
+            <div class="calibration-controls">
+              <fieldset>
+                <legend>Columnas</legend>
+                <label>Límite 1 <input id="cal-v1" type="range" min="10" max="30" value="20"></label>
+                <label>Límite 2 <input id="cal-v2" type="range" min="25" max="50" value="40"></label>
+                <label>Límite 3 <input id="cal-v3" type="range" min="45" max="70" value="60"></label>
+                <label>Límite 4 <input id="cal-v4" type="range" min="65" max="90" value="80"></label>
+              </fieldset>
+              <fieldset>
+                <legend>Filas</legend>
+                <label>Primero 1 / 2 <input id="cal-h1" type="range" min="8" max="25" value="15"></label>
+                <label>Primero 2 / 3 <input id="cal-h2" type="range" min="20" max="40" value="29"></label>
+                <label>Primero 3 / SEGUNDOS <input id="cal-h3" type="range" min="33" max="55" value="43"></label>
+                <label>SEGUNDOS / Segundo 1 <input id="cal-h4" type="range" min="42" max="65" value="52"></label>
+                <label>Segundo 1 / 2 <input id="cal-h5" type="range" min="55" max="80" value="68"></label>
+                <label>Segundo 2 / 3 <input id="cal-h6" type="range" min="72" max="94" value="84"></label>
+              </fieldset>
             </div>
             <div class="editor-actions calibration-actions">
+              <button id="restablecer-calibracion" class="secondary-action" type="button">Restablecer</button>
               <button id="guardar-calibracion" class="secondary-action" type="button">Guardar calibración</button>
-              <button id="generar-celdas" class="primary-action" type="button">Ver 30 recortes</button>
+              <button id="ver-recortes" class="primary-action" type="button">Ver 30 recortes</button>
             </div>
-            <div id="calibracion-mensaje" class="editor-message" role="status" aria-live="polite"></div>
           </div>
+          <p class="file-help">Ajusta el marco desde la fila de los días hasta justo antes de DIETA Y PLANCHA. Ajusta el marco exterior. Después calibra las columnas y las 7 franjas visuales, incluida la fila SEGUNDOS, que no se leerá.</p>
+        </div>
+        <div class="editor-actions import-actions">
+          <button id="leer-foto" class="primary-action" type="button" disabled>Leer 30 celdas</button>
+        </div>
+        <div id="ocr-progreso" class="editor-message" role="status" aria-live="polite"></div>
+      </section>
+
+      <section id="vista-recortes" class="editor-day-card cuts-preview" hidden>
+        <div class="calibration-heading">
+          <div>
+            <p class="status-label">Diagnóstico</p>
+            <h2>Vista previa de los 30 recortes</h2>
+          </div>
+          <button id="cerrar-recortes" class="secondary-action" type="button">Cerrar</button>
+        </div>
+        <p class="import-help">Cada tarjeta debe contener un único plato. La franja SEGUNDOS se descarta automáticamente.</p>
+        <div id="recortes-grid" class="cuts-grid"></div>
+      </section>
+
+      <section id="revision-ocr" class="editor-day-card import-review" hidden>
+        <p class="status-label">Menú reconstruido</p>
+        <h2>Revisa los platos antes de preparar la semana</h2>
+        <p class="import-help">La app detecta las líneas horizontales de la tabla y lee cada plato dentro de su celda real. Revisa 3 primeros y 3 segundos por día; la dieta estándar se añade automáticamente.</p>
+        <div id="ocr-dias" class="ocr-days"></div>
+        <div class="editor-actions">
+          <button id="plantilla-semana" class="secondary-action" type="button">Crear plantilla</button>
+          <button id="preparar-semana" class="primary-action publish-button" type="button">Preparar semana</button>
         </div>
       </section>
 
-      <section id="diagnostico-celdas" class="editor-day-card diagnostic-card" hidden>
-        <p class="status-label">Diagnóstico · 30 celdas</p>
-        <h2>Comprueba que cada recorte contiene un solo plato</h2>
-        <p class="import-help">Si alguna celda corta texto o mezcla dos platos, vuelve arriba y mueve la línea correspondiente. La calibración queda guardada solo en este dispositivo.</p>
-        <div id="celdas-preview" class="cells-preview"></div>
+      <section id="resultado-importacion" class="editor-day-card import-result" hidden>
+        <p class="status-label">Comparación</p>
+        <h2 id="resultado-titulo">Semana preparada</h2>
+        <div id="resultado-detalle" class="comparison-list"></div>
+        <label id="permitir-actualizaciones-wrap" class="festivo-toggle" hidden>
+          <input id="permitir-actualizaciones" type="checkbox">
+          <span>
+            <strong>Permitir actualizar días ya publicados</strong>
+            <small>Solo úsalo cuando la foto contenga cambios reales en una fecha existente.</small>
+          </span>
+        </label>
+        <div class="editor-actions">
+          <button id="aplicar-semana" class="primary-action publish-button" type="button" disabled>Revisar en editor</button>
+        </div>
+        <div id="importador-mensaje" class="editor-message" role="status" aria-live="polite"></div>
       </section>
     </section>
 
     <section id="vista-editor" class="editor-view" hidden>
       <header class="editor-header">
         <button id="volver-inicio" class="back-button" type="button">← Volver</button>
-        <p class="eyebrow">Editor · V5.1</p>
+        <p class="eyebrow">Editor · V6</p>
         <h1>Editar menú</h1>
         <p class="intro">Selecciona una fecha, modifica los platos y publica cuando esté revisado.</p>
       </header>
@@ -214,6 +257,7 @@
     </section>
   </main>
   <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-    <script src="app.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>

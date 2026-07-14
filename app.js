@@ -11,11 +11,7 @@ let comparacionImportacion = null;
 let fuenteImportacion = null;
 let urlPreviewImportacion = null;
 let limitesFilasDetectados = null;
-const CALIBRATION_KEY = "menu-dashboard-v5-calibration";
-const DEFAULT_GRID_X = [0, 0.20, 0.40, 0.60, 0.80, 1];
-const DEFAULT_GRID_Y = [0, 0.17, 0.33, 0.50, 0.67, 0.83, 1];
-let gridX = [...DEFAULT_GRID_X];
-let gridY = [...DEFAULT_GRID_Y];
+const CALIBRATION_KEY = "menuDashboardCalibrationV6";
 
 function fechaDesdeClave(clave) {
   const [year, month, day] = clave.split("-").map(Number);
@@ -636,40 +632,60 @@ function valoresRecorte() {
   return { top: top / 100, bottom: Math.min(bottom, 100) / 100, left: left / 100, right: Math.min(right, 100) / 100 };
 }
 
+function calibracionActual() {
+  const verticales = ["cal-v1", "cal-v2", "cal-v3", "cal-v4"].map(id => Number($(id).value) / 100);
+  const horizontales = ["cal-h1", "cal-h2", "cal-h3", "cal-h4", "cal-h5", "cal-h6"].map(id => Number($(id).value) / 100);
+  return { verticales, horizontales };
+}
+
+function aplicarCalibracion(calibracion) {
+  if (!calibracion) return;
+  (calibracion.verticales || []).slice(0, 4).forEach((valor, i) => { const el = $(`cal-v${i + 1}`); if (el) el.value = Math.round(valor * 100); });
+  (calibracion.horizontales || []).slice(0, 6).forEach((valor, i) => { const el = $(`cal-h${i + 1}`); if (el) el.value = Math.round(valor * 100); });
+}
+
 function cargarCalibracionGuardada() {
   try {
-    const data = JSON.parse(localStorage.getItem(CALIBRATION_KEY) || "null");
-    if (Array.isArray(data?.gridX) && data.gridX.length === 6) gridX = data.gridX;
-    if (Array.isArray(data?.gridY) && data.gridY.length === 7) gridY = data.gridY;
-    if (data?.crop) {
-      for (const id of ["top", "bottom", "left", "right"]) {
-        const input = $(`crop-${id}`);
-        if (input && Number.isFinite(Number(data.crop[id]))) input.value = data.crop[id];
-      }
+    const guardada = JSON.parse(localStorage.getItem(CALIBRATION_KEY) || "null");
+    if (guardada) {
+      aplicarCalibracion(guardada);
+      $("calibracion-estado").textContent = "Guardada";
+      $("calibracion-estado").classList.remove("has-changes");
     }
-  } catch (error) { console.warn("No se pudo cargar la calibración", error); }
-  sincronizarSlidersCalibracion();
+  } catch {}
 }
 
-function sincronizarSlidersCalibracion() {
-  document.querySelectorAll(".grid-x").forEach(input => { input.value = Math.round(gridX[Number(input.dataset.index)] * 100); });
-  document.querySelectorAll(".grid-y").forEach(input => { input.value = Math.round(gridY[Number(input.dataset.index)] * 100); });
+function normalizarSeparadores(ids, minGap = 0.035) {
+  const els = ids.map(id => $(id));
+  const valores = els.map(el => Number(el.value) / 100);
+  for (let i = 1; i < valores.length; i++) valores[i] = Math.max(valores[i], valores[i - 1] + minGap);
+  for (let i = valores.length - 2; i >= 0; i--) valores[i] = Math.min(valores[i], valores[i + 1] - minGap);
+  valores.forEach((v, i) => { els[i].value = Math.round(Math.max(0.03, Math.min(0.97, v)) * 100); });
 }
 
-function leerSlidersCalibracion() {
-  document.querySelectorAll(".grid-x").forEach(input => { gridX[Number(input.dataset.index)] = Number(input.value) / 100; });
-  document.querySelectorAll(".grid-y").forEach(input => { gridY[Number(input.dataset.index)] = Number(input.value) / 100; });
-  gridX[0] = 0; gridX[5] = 1; gridY[0] = 0; gridY[6] = 1;
+function calibracionModificada(tipo) {
+  normalizarSeparadores(tipo === "v" ? ["cal-v1", "cal-v2", "cal-v3", "cal-v4"] : ["cal-h1", "cal-h2", "cal-h3", "cal-h4", "cal-h5", "cal-h6"], tipo === "v" ? 0.06 : 0.045);
+  $("calibracion-estado").textContent = "Sin guardar";
+  $("calibracion-estado").classList.add("has-changes");
+  dibujarPreviewRecorte();
 }
 
-function rejillaValida() {
-  const ordenada = valores => valores.every((v, i) => i === 0 || v > valores[i - 1] + 0.035);
-  return ordenada(gridX) && ordenada(gridY);
+function guardarCalibracion() {
+  localStorage.setItem(CALIBRATION_KEY, JSON.stringify(calibracionActual()));
+  $("calibracion-estado").textContent = "Guardada";
+  $("calibracion-estado").classList.remove("has-changes");
+}
+
+function restablecerCalibracion() {
+  aplicarCalibracion({ verticales: [.20,.40,.60,.80], horizontales: [.15,.29,.43,.52,.68,.84] });
+  localStorage.removeItem(CALIBRATION_KEY);
+  $("calibracion-estado").textContent = "Sin guardar";
+  $("calibracion-estado").classList.add("has-changes");
+  dibujarPreviewRecorte();
 }
 
 function dibujarPreviewRecorte() {
   if (!fuenteImportacion) return;
-  leerSlidersCalibracion();
   const preview = $("recorte-preview");
   const ctx = preview.getContext("2d");
   const maxW = 900;
@@ -678,185 +694,91 @@ function dibujarPreviewRecorte() {
   preview.height = Math.round(fuenteImportacion.height * escala);
   ctx.drawImage(fuenteImportacion, 0, 0, preview.width, preview.height);
   const r = valoresRecorte();
-  const x = r.left * preview.width, y = r.top * preview.height;
-  const w = (r.right-r.left)*preview.width, h = (r.bottom-r.top)*preview.height;
+  const x = r.left * preview.width, y = r.top * preview.height, w = (r.right-r.left)*preview.width, h = (r.bottom-r.top)*preview.height;
   ctx.fillStyle = "rgba(0,0,0,.48)";
   ctx.fillRect(0,0,preview.width,y); ctx.fillRect(0,y,x,h); ctx.fillRect(x+w,y,preview.width-x-w,h); ctx.fillRect(0,y+h,preview.width,preview.height-y-h);
   ctx.strokeStyle = "#e30613"; ctx.lineWidth = Math.max(3, preview.width/250); ctx.strokeRect(x,y,w,h);
-  ctx.lineWidth = Math.max(2, preview.width/400);
-  gridX.slice(1,-1).forEach(pos => { const xx=x+w*pos; ctx.strokeStyle="rgba(0,122,255,.92)"; ctx.beginPath(); ctx.moveTo(xx,y); ctx.lineTo(xx,y+h); ctx.stroke(); });
-  gridY.slice(1,-1).forEach(pos => { const yy=y+h*pos; ctx.strokeStyle="rgba(227,6,19,.92)"; ctx.beginPath(); ctx.moveTo(x,yy); ctx.lineTo(x+w,yy); ctx.stroke(); });
-  for (let fila=0; fila<6; fila++) for (let col=0; col<5; col++) {
-    const cx=x+w*(gridX[col]+gridX[col+1])/2, cy=y+h*(gridY[fila]+gridY[fila+1])/2;
-    ctx.fillStyle="rgba(17,17,17,.72)"; ctx.beginPath(); ctx.arc(cx,cy,Math.max(9,preview.width/70),0,Math.PI*2); ctx.fill();
-    ctx.fillStyle="#fff"; ctx.font=`700 ${Math.max(10,preview.width/85)}px sans-serif`; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(String(fila*5+col+1),cx,cy);
-  }
-}
 
-function guardarCalibracion() {
-  leerSlidersCalibracion();
-  if (!rejillaValida()) return mostrarMensajeCalibracion("Las líneas se cruzan o están demasiado juntas.", "error");
-  const crop = {};
-  for (const id of ["top", "bottom", "left", "right"]) crop[id] = Number($(`crop-${id}`).value);
-  localStorage.setItem(CALIBRATION_KEY, JSON.stringify({ gridX, gridY, crop, savedAt: new Date().toISOString() }));
-  mostrarMensajeCalibracion("Calibración guardada en este dispositivo.", "success");
-}
-
-function restaurarCalibracion() {
-  gridX = [...DEFAULT_GRID_X]; gridY = [...DEFAULT_GRID_Y];
-  localStorage.removeItem(CALIBRATION_KEY);
-  sincronizarSlidersCalibracion(); dibujarPreviewRecorte();
-  $("diagnostico-celdas").hidden = true;
-  mostrarMensajeCalibracion("Calibración restaurada a los valores iniciales.", "info");
-}
-
-function mostrarMensajeCalibracion(texto, tipo="info") {
-  const el = $("calibracion-mensaje");
-  el.textContent = texto; el.className = `editor-message message-${tipo}`;
-}
-
-function crearRecorteCalibrado(columna, fila) {
-  const r = valoresRecorte();
-  const tablaX = fuenteImportacion.width * r.left, tablaY = fuenteImportacion.height * r.top;
-  const tablaW = fuenteImportacion.width * (r.right-r.left), tablaH = fuenteImportacion.height * (r.bottom-r.top);
-  const x0 = gridX[columna], x1 = gridX[columna+1], y0 = gridY[fila], y1 = gridY[fila+1];
-  const margenX = Math.min(0.025, (x1-x0)*0.10), margenY = Math.min(0.035, (y1-y0)*0.14);
-  const sx = tablaX + tablaW*(x0+margenX), sy = tablaY + tablaH*(y0+margenY);
-  const sw = tablaW*Math.max(0.01, x1-x0-2*margenX), sh = tablaH*Math.max(0.01, y1-y0-2*margenY);
-  const canvas=document.createElement("canvas");
-  const scale=Math.min(3, 700/Math.max(sw,1));
-  canvas.width=Math.max(240,Math.round(sw*scale)); canvas.height=Math.max(95,Math.round(sh*scale));
-  const ctx=canvas.getContext("2d",{alpha:false}); ctx.fillStyle="#fff"; ctx.fillRect(0,0,canvas.width,canvas.height);
-  ctx.drawImage(fuenteImportacion,sx,sy,sw,sh,0,0,canvas.width,canvas.height);
-  return canvas;
-}
-
-function generarVistaCeldas() {
-  if (!fuenteImportacion) return;
-  leerSlidersCalibracion();
-  if (!rejillaValida()) return mostrarMensajeCalibracion("Corrige las líneas antes de generar los recortes.", "error");
-  const contenedor=$("celdas-preview"); contenedor.innerHTML="";
-  const dias=["Lunes","Martes","Miércoles","Jueves","Viernes"];
-  for (let fila=0; fila<6; fila++) for (let col=0; col<5; col++) {
-    const item=document.createElement("article"); item.className="cell-preview-card";
-    const cab=document.createElement("div"); cab.className="cell-preview-heading";
-    const tipo=fila<3?"Primero":"Segundo", numero=(fila%3)+1;
-    cab.innerHTML=`<strong>${dias[col]}</strong><span>${tipo} ${numero}</span>`;
-    item.append(cab,crearRecorteCalibrado(col,fila)); contenedor.appendChild(item);
-  }
-  $("diagnostico-celdas").hidden=false;
-  mostrarMensajeCalibracion("Recortes generados. Comprueba visualmente los 30.", "success");
-  $("diagnostico-celdas").scrollIntoView({behavior:"smooth",block:"start"});
-}
-
-function detectarLimitesFilasTabla() {
-  if (!fuenteImportacion) return null;
-  const r = valoresRecorte();
-  const sx = Math.round(fuenteImportacion.width * r.left);
-  const sy = Math.round(fuenteImportacion.height * r.top);
-  const sw = Math.max(1, Math.round(fuenteImportacion.width * (r.right - r.left)));
-  const sh = Math.max(1, Math.round(fuenteImportacion.height * (r.bottom - r.top)));
-
-  const escala = Math.min(1, 1100 / sw);
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.max(500, Math.round(sw * escala));
-  canvas.height = Math.max(220, Math.round(sh * escala));
-  const ctx = canvas.getContext("2d", { alpha: false, willReadFrequently: true });
-  ctx.drawImage(fuenteImportacion, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
-  const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const puntuaciones = new Array(canvas.height).fill(0);
-  const x0 = Math.round(canvas.width * 0.015);
-  const x1 = Math.round(canvas.width * 0.985);
-
-  for (let y = 0; y < canvas.height; y++) {
-    let oscuros = 0;
-    for (let x = x0; x < x1; x++) {
-      const i = (y * canvas.width + x) * 4;
-      const gris = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-      if (gris < 155) oscuros++;
-    }
-    puntuaciones[y] = oscuros / Math.max(1, x1 - x0);
-  }
-
-  const suavizadas = puntuaciones.map((_, y) => {
-    let suma = 0, n = 0;
-    for (let k = -2; k <= 2; k++) {
-      if (puntuaciones[y + k] != null) { suma += puntuaciones[y + k]; n++; }
-    }
-    return suma / n;
+  const { verticales, horizontales } = calibracionActual();
+  ctx.lineWidth = Math.max(1.5, preview.width / 500);
+  ctx.strokeStyle = "rgba(227,6,19,.9)";
+  verticales.forEach(v => { const xx = x + w * v; ctx.beginPath(); ctx.moveTo(xx,y); ctx.lineTo(xx,y+h); ctx.stroke(); });
+  horizontales.forEach((v, i) => {
+    const yy = y + h * v;
+    ctx.strokeStyle = i === 2 || i === 3 ? "rgba(255,149,0,.95)" : "rgba(227,6,19,.9)";
+    ctx.beginPath(); ctx.moveTo(x,yy); ctx.lineTo(x+w,yy); ctx.stroke();
   });
-
-  // Posiciones aproximadas de las diez líneas que delimitan:
-  // días, PRIMEROS, 3 platos, SEGUNDOS y 3 platos.
-  const esperadas = [0.0, 0.075, 0.145, 0.275, 0.405, 0.535, 0.605, 0.735, 0.865, 1.0];
-  const limites = esperadas.map((esperada, indice) => {
-    if (indice === 0) return 0;
-    if (indice === esperadas.length - 1) return 1;
-    const radio = indice === 5 || indice === 6 ? 0.05 : 0.045;
-    const desde = Math.max(1, Math.floor((esperada - radio) * canvas.height));
-    const hasta = Math.min(canvas.height - 2, Math.ceil((esperada + radio) * canvas.height));
-    let mejorY = Math.round(esperada * canvas.height), mejor = -1;
-    for (let y = desde; y <= hasta; y++) {
-      // Las líneas reales atraviesan casi todo el ancho; el texto no.
-      const valor = suavizadas[y];
-      if (valor > mejor) { mejor = valor; mejorY = y; }
-    }
-    return mejor >= 0.13 ? mejorY / canvas.height : esperada;
-  });
-
-  // Evita límites cruzados si la foto tiene sombras o mucho ruido.
-  for (let i = 1; i < limites.length; i++) {
-    const minimo = limites[i - 1] + 0.035;
-    if (limites[i] < minimo) limites[i] = Math.min(1, minimo);
-  }
-  limites[0] = 0;
-  limites[limites.length - 1] = 1;
-  return limites;
+  const segundosTop = y + h * horizontales[2];
+  const segundosBottom = y + h * horizontales[3];
+  ctx.fillStyle = "rgba(255,149,0,.18)";
+  ctx.fillRect(x, segundosTop, w, segundosBottom - segundosTop);
+  ctx.fillStyle = "rgba(255,255,255,.92)";
+  ctx.font = `700 ${Math.max(11, preview.width/60)}px system-ui`;
+  ctx.textAlign = "center";
+  ctx.fillText("SEGUNDOS · NO SE LEE", x + w/2, segundosTop + Math.max(15, (segundosBottom-segundosTop)/2 + 5));
 }
 
-function crearCanvasCelda(indiceDia, indicePlato) {
+function limitesColumnasCalibrados() {
+  const { verticales } = calibracionActual();
+  return [0, ...verticales, 1];
+}
+
+function limitesFilasCalibrados() {
+  const { horizontales } = calibracionActual();
+  return [0, ...horizontales, 1];
+}
+
+function geometriaCelda(indiceDia, indicePlato) {
   const r = valoresRecorte();
-  const anchoTabla = fuenteImportacion.width * (r.right - r.left);
-  const altoTabla = fuenteImportacion.height * (r.bottom - r.top);
-  const anchoColumna = anchoTabla / 5;
-  const limites = limitesFilasDetectados || detectarLimitesFilasTabla();
-  const filasPlatos = [[2,3], [3,4], [4,5], [6,7], [7,8], [8,9]];
-  const [inicio, fin] = filasPlatos[indicePlato];
-  const inicioY = limites?.[inicio] ?? [0.145,0.275,0.405,0.605,0.735,0.865][indicePlato];
-  const finY = limites?.[fin] ?? [0.275,0.405,0.535,0.735,0.865,1][indicePlato];
+  const columnas = limitesColumnasCalibrados();
+  const filas = limitesFilasCalibrados();
+  const bandasPlato = [0, 1, 2, 4, 5, 6];
+  const banda = bandasPlato[indicePlato];
+  const x0 = columnas[indiceDia], x1 = columnas[indiceDia + 1];
+  const y0 = filas[banda], y1 = filas[banda + 1];
+  const anchoTabla = fuenteImportacion.width * (r.right-r.left);
+  const altoTabla = fuenteImportacion.height * (r.bottom-r.top);
+  const margenXIzq = 0.025, margenXDer = 0.075, margenY = 0.08;
+  return {
+    sx: fuenteImportacion.width*r.left + anchoTabla*(x0 + (x1-x0)*margenXIzq),
+    sy: fuenteImportacion.height*r.top + altoTabla*(y0 + (y1-y0)*margenY),
+    sw: anchoTabla*(x1-x0)*(1-margenXIzq-margenXDer),
+    sh: altoTabla*(y1-y0)*(1-margenY*2)
+  };
+}
 
-  const margenIzquierdo = 0.035;
-  const margenDerecho = 0.085;
-  const margenVertical = 0.10;
-  const sx = fuenteImportacion.width * r.left + anchoColumna * indiceDia + anchoColumna * margenIzquierdo;
-  const sy = fuenteImportacion.height * r.top + altoTabla * inicioY + altoTabla * (finY - inicioY) * margenVertical;
-  const sw = anchoColumna * (1 - margenIzquierdo - margenDerecho);
-  const sh = altoTabla * (finY - inicioY) * (1 - margenVertical * 2);
-
-  const escala = Math.max(3.5, 1350 / Math.max(sw, 1));
+function crearCanvasCelda(indiceDia, indicePlato, procesar = true) {
+  const { sx, sy, sw, sh } = geometriaCelda(indiceDia, indicePlato);
+  const escala = procesar ? Math.max(3.5, 1350 / Math.max(sw, 1)) : Math.max(1.2, 420 / Math.max(sw, 1));
   const canvas = document.createElement("canvas");
-  canvas.width = Math.max(650, Math.round(sw * escala));
-  canvas.height = Math.max(170, Math.round(sh * escala));
+  canvas.width = Math.max(procesar ? 650 : 260, Math.round(sw * escala));
+  canvas.height = Math.max(procesar ? 170 : 90, Math.round(sh * escala));
   const ctx = canvas.getContext("2d", { alpha: false, willReadFrequently: true });
-  ctx.fillStyle = "#fff";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = "high";
+  ctx.fillStyle = "#fff"; ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
   ctx.drawImage(fuenteImportacion, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
-
+  if (!procesar) return canvas;
   const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const d = image.data;
-  let suma = 0;
-  for (let i = 0; i < d.length; i += 4) suma += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-  const media = suma / (d.length / 4);
-  const umbral = Math.max(145, Math.min(210, media - 20));
-  for (let i = 0; i < d.length; i += 4) {
-    const g = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-    const c = g > umbral ? 255 : 0;
-    d[i] = d[i + 1] = d[i + 2] = c;
+  const d = image.data; let suma = 0;
+  for (let i = 0; i < d.length; i += 4) suma += 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
+  const media = suma / (d.length/4); const umbral = Math.max(145, Math.min(210, media - 20));
+  for (let i = 0; i < d.length; i += 4) { const g=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2]; const c=g>umbral?255:0; d[i]=d[i+1]=d[i+2]=c; }
+  ctx.putImageData(image,0,0); return canvas;
+}
+
+function verTreintaRecortes() {
+  if (!fuenteImportacion) return;
+  const grid = $("recortes-grid"); grid.innerHTML = "";
+  const nombres = ["Primero 1","Primero 2","Primero 3","Segundo 1","Segundo 2","Segundo 3"];
+  for (let dia=0; dia<5; dia++) {
+    for (let plato=0; plato<6; plato++) {
+      const card=document.createElement("article"); card.className="cut-card";
+      const title=document.createElement("strong"); title.textContent=`${nombreDiaDesdeIndice(dia)} · ${nombres[plato]}`;
+      const canvas=crearCanvasCelda(dia,plato,false); card.append(title,canvas); grid.appendChild(card);
+    }
   }
-  ctx.putImageData(image, 0, 0);
-  return canvas;
+  $("vista-recortes").hidden=false;
+  $("vista-recortes").scrollIntoView({behavior:"smooth",block:"start"});
 }
 
 function limpiarTextoCelda(texto) {
@@ -905,8 +827,7 @@ async function leerFotoConOcr() {
       preserve_interword_spaces: "1"
     });
 
-    limitesFilasDetectados = detectarLimitesFilasTabla();
-    $("ocr-progreso").textContent = limitesFilasDetectados ? "Líneas de la tabla detectadas. Iniciando lectura…" : "Usando división de respaldo…";
+    $("ocr-progreso").textContent = "Usando la calibración visual guardada…";
 
     const dias = Array.from({ length: 5 }, () => ({
       primeros: ["", "", ""],
@@ -948,19 +869,17 @@ async function leerFotoConOcr() {
 }
 
 async function fotoSeleccionada() {
-  const archivo = $("foto-menu").files?.[0];
-  $("diagnostico-celdas").hidden = true;
-  if (!archivo) { fuenteImportacion = null; $("recorte-panel").hidden = true; return; }
-  mostrarMensajeCalibracion("Preparando vista previa…", "info");
+  const archivo=$("foto-menu").files?.[0];
+  $("leer-foto").disabled=!archivo; $("revision-ocr").hidden=true; $("resultado-importacion").hidden=true;
+  if (!archivo) { fuenteImportacion=null; limitesFilasDetectados=null; $("recorte-panel").hidden=true; return; }
+  $("ocr-progreso").textContent="Preparando vista previa…"; $("ocr-progreso").className="editor-message message-info";
   try {
-    fuenteImportacion = await cargarFuenteImagen(archivo);
-    cargarCalibracionGuardada();
-    $("recorte-panel").hidden = false;
-    dibujarPreviewRecorte();
-    mostrarMensajeCalibracion("Ajusta el marco y la rejilla. Después genera los 30 recortes.", "info");
-  } catch (error) {
-    console.error(error); fuenteImportacion = null;
-    mostrarMensajeCalibracion("No se pudo preparar el archivo.", "error");
+    fuenteImportacion=await cargarFuenteImagen(archivo); limitesFilasDetectados=null;
+    $("recorte-panel").hidden=false; cargarCalibracionGuardada(); dibujarPreviewRecorte();
+    $("ocr-progreso").textContent="Ajusta el marco a la tabla y pulsa Leer 30 celdas.";
+  } catch(error) {
+    console.error(error); fuenteImportacion=null; $("leer-foto").disabled=true;
+    $("ocr-progreso").textContent="No se pudo preparar el archivo."; $("ocr-progreso").className="editor-message message-error";
   }
 }
 
@@ -982,11 +901,20 @@ function prepararEventos() {
   $("abrir-importador").addEventListener("click", abrirImportador);
   $("volver-importador").addEventListener("click", volverDesdeImportador);
   $("foto-menu").addEventListener("change", fotoSeleccionada);
-  ["crop-top", "crop-bottom", "crop-left", "crop-right"].forEach(id => $(id).addEventListener("input", () => { dibujarPreviewRecorte(); $("diagnostico-celdas").hidden = true; }));
-  document.querySelectorAll(".grid-slider").forEach(input => input.addEventListener("input", () => { leerSlidersCalibracion(); dibujarPreviewRecorte(); $("diagnostico-celdas").hidden = true; }));
+  ["crop-top", "crop-bottom", "crop-left", "crop-right"].forEach(id => $(id).addEventListener("input", dibujarPreviewRecorte));
+  ["cal-v1", "cal-v2", "cal-v3", "cal-v4"].forEach(id => $(id).addEventListener("input", () => calibracionModificada("v")));
+  ["cal-h1", "cal-h2", "cal-h3", "cal-h4", "cal-h5", "cal-h6"].forEach(id => $(id).addEventListener("input", () => calibracionModificada("h")));
   $("guardar-calibracion").addEventListener("click", guardarCalibracion);
-  $("restaurar-calibracion").addEventListener("click", restaurarCalibracion);
-  $("generar-celdas").addEventListener("click", generarVistaCeldas);
+  $("restablecer-calibracion").addEventListener("click", restablecerCalibracion);
+  $("ver-recortes").addEventListener("click", verTreintaRecortes);
+  $("cerrar-recortes").addEventListener("click", () => { $("vista-recortes").hidden = true; });
+  $("leer-foto").addEventListener("click", leerFotoConOcr);
+  $("plantilla-semana").addEventListener("click", crearPlantillaSemana);
+  $("preparar-semana").addEventListener("click", prepararSemanaDesdeTexto);
+  $("permitir-actualizaciones").addEventListener("change", event => {
+    $("aplicar-semana").disabled = comparacionImportacion?.modificados?.length ? !event.target.checked : false;
+  });
+  $("aplicar-semana").addEventListener("click", aplicarSemanaAlEditor);
   $("volver-inicio").addEventListener("click", volverAlInicio);
   $("cerrar-sesion").addEventListener("click", cerrarSesion);
   $("selector-fecha").addEventListener("change", event => mostrarMenuDeFecha(event.target.value));
