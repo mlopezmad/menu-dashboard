@@ -26,7 +26,7 @@
 
     <section id="vista-inicio">
       <header class="dashboard-header">
-        <p class="eyebrow">Menú comedor · V4.2</p>
+        <p class="eyebrow">Menú comedor · V4.3</p>
         <h1>Gestor del menú</h1>
         <p class="intro">Actualiza, revisa y publica el menú semanal desde el móvil.</p>
       </header>
@@ -69,7 +69,7 @@
     <section id="vista-importador" class="editor-view" hidden>
       <header class="editor-header">
         <button id="volver-importador" class="back-button" type="button">← Volver</button>
-        <p class="eyebrow">Importador · V4.2</p>
+        <p class="eyebrow">Importador · V4.3</p>
         <h1>Subir menú semanal</h1>
         <p class="intro">Selecciona una foto o un PDF, ajusta el recorte y lee cada día por separado sin borrar los días publicados.</p>
       </header>
@@ -99,7 +99,7 @@
           <p class="file-help">El marco se divide en cinco columnas. Termina el recorte justo antes de DIETA Y PLANCHA: esa parte se añade automáticamente.</p>
         </div>
         <div class="editor-actions import-actions">
-          <button id="leer-foto" class="primary-action" type="button" disabled>Leer 5 días</button>
+          <button id="leer-foto" class="primary-action" type="button" disabled>Leer 30 celdas</button>
         </div>
         <div id="ocr-progreso" class="editor-message" role="status" aria-live="polite"></div>
       </section>
@@ -107,7 +107,7 @@
       <section id="revision-ocr" class="editor-day-card import-review" hidden>
         <p class="status-label">Menú reconstruido</p>
         <h2>Revisa los platos antes de preparar la semana</h2>
-        <p class="import-help">El sistema limpia alérgenos y símbolos, reconstruye 3 primeros y 3 segundos por día y añade la dieta estándar automáticamente.</p>
+        <p class="import-help">Cada plato se lee en su propia celda para evitar que se mezclen filas y alérgenos. Revisa 3 primeros y 3 segundos por día; la dieta estándar se añade automáticamente.</p>
         <div id="ocr-dias" class="ocr-days"></div>
         <div class="editor-actions">
           <button id="plantilla-semana" class="secondary-action" type="button">Crear plantilla</button>
@@ -136,7 +136,7 @@
     <section id="vista-editor" class="editor-view" hidden>
       <header class="editor-header">
         <button id="volver-inicio" class="back-button" type="button">← Volver</button>
-        <p class="eyebrow">Editor · V4.2</p>
+        <p class="eyebrow">Editor · V4.3</p>
         <h1>Editar menú</h1>
         <p class="intro">Selecciona una fecha, modifica los platos y publica cuando esté revisado.</p>
       </header>

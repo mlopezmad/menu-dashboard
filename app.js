@@ -648,26 +648,88 @@ function dibujarPreviewRecorte() {
   for (let i=1;i<5;i++) { const xx=x+w*i/5; ctx.beginPath(); ctx.moveTo(xx,y); ctx.lineTo(xx,y+h); ctx.stroke(); }
 }
 
-function crearCanvasColumna(indice) {
+function crearCanvasCelda(indiceDia, indicePlato) {
   const r = valoresRecorte();
-  const sx = fuenteImportacion.width * (r.left + (r.right-r.left)*indice/5);
-  const sy = fuenteImportacion.height * r.top;
-  const sw = fuenteImportacion.width * (r.right-r.left)/5;
-  const sh = fuenteImportacion.height * (r.bottom-r.top);
-  const escala = Math.max(2.2, 1500 / sw);
+  const anchoTabla = fuenteImportacion.width * (r.right - r.left);
+  const altoTabla = fuenteImportacion.height * (r.bottom - r.top);
+  const anchoColumna = anchoTabla / 5;
+
+  // El recorte comprende: cabecera del día, PRIMEROS, 3 platos,
+  // SEGUNDOS y 3 platos. Solo leemos las seis filas de comida.
+  const franjas = [
+    [0.135, 0.270], // primer 1
+    [0.270, 0.400], // primer 2
+    [0.400, 0.530], // primer 3
+    [0.595, 0.730], // segundo 1
+    [0.730, 0.865], // segundo 2
+    [0.865, 0.995]  // segundo 3
+  ];
+  const [inicioY, finY] = franjas[indicePlato];
+
+  // Recortamos los bordes de la celda: ahí suelen estar las líneas
+  // de la tabla y buena parte de los iconos de alérgenos.
+  const margenIzquierdo = 0.055;
+  const margenDerecho = 0.075;
+  const margenVertical = 0.12;
+  const sx = fuenteImportacion.width * r.left
+    + anchoColumna * indiceDia
+    + anchoColumna * margenIzquierdo;
+  const sy = fuenteImportacion.height * r.top
+    + altoTabla * inicioY
+    + altoTabla * (finY - inicioY) * margenVertical;
+  const sw = anchoColumna * (1 - margenIzquierdo - margenDerecho);
+  const sh = altoTabla * (finY - inicioY) * (1 - margenVertical * 2);
+
+  const escala = Math.max(3.2, 1250 / Math.max(sw, 1));
   const canvas = document.createElement("canvas");
-  canvas.width = Math.round(sw * escala); canvas.height = Math.round(sh * escala);
+  canvas.width = Math.max(600, Math.round(sw * escala));
+  canvas.height = Math.max(150, Math.round(sh * escala));
   const ctx = canvas.getContext("2d", { alpha: false, willReadFrequently: true });
-  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
   ctx.drawImage(fuenteImportacion, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
-  const image = ctx.getImageData(0,0,canvas.width,canvas.height); const d=image.data;
-  for (let i=0;i<d.length;i+=4) {
-    const g = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
-    const c = g > 205 ? 255 : g < 80 ? 0 : Math.max(0, Math.min(255, (g-128)*1.7+128));
-    d[i]=d[i+1]=d[i+2]=c;
+
+  // Escala de grises, contraste y binarización suave. El objetivo es
+  // conservar letras finas y reducir líneas/iconos de la tabla.
+  const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const d = image.data;
+  let suma = 0;
+  for (let i = 0; i < d.length; i += 4) {
+    const g = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    suma += g;
   }
-  ctx.putImageData(image,0,0);
+  const media = suma / (d.length / 4);
+  const umbral = Math.max(135, Math.min(205, media - 24));
+  for (let i = 0; i < d.length; i += 4) {
+    const g = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    const c = g > umbral ? 255 : 0;
+    d[i] = d[i + 1] = d[i + 2] = c;
+  }
+  ctx.putImageData(image, 0, 0);
   return canvas;
+}
+
+function limpiarTextoCelda(texto) {
+  let limpio = String(texto || "")
+    .replace(/\r/g, " ")
+    .replace(/\n+/g, " ")
+    .replace(/[\[\]{}<>|_=~^`´“”•·▪◦*]+/g, " ")
+    .replace(/\([^)]{0,8}\)/g, " ")
+    .replace(/(^|\s)[0-9]{1,2}(?=\s|$)/g, " ")
+    .replace(/\b(?:ED|EZ|EO|OE|EE|EC|CE|EJ|GG|UC|ES)\)?\b/gi, " ")
+    .replace(/^[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+/, "")
+    .replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+$/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  // Restos cortos producidos por iconos al principio/final.
+  const palabras = limpio.split(/\s+/).filter(Boolean);
+  while (palabras.length > 1 && palabras[0].length <= 2 && !/^(A|AL|DE|DEL|EN|LA|LAS|LOS|Y)$/i.test(palabras[0])) palabras.shift();
+  while (palabras.length > 1 && palabras.at(-1).length <= 2 && !/^(A|AL|DE|DEL|EN|LA|LAS|LOS|Y)$/i.test(palabras.at(-1))) palabras.pop();
+  limpio = palabras.join(" ");
+  return corregirConDiccionario(limpio);
 }
 
 async function leerFotoConOcr() {
@@ -676,31 +738,61 @@ async function leerFotoConOcr() {
   if (!window.Tesseract) return window.alert("No se pudo cargar el OCR gratuito.");
   const lunes = $("lunes-semana").value;
   if (!lunes) return window.alert("Selecciona el lunes de la semana.");
-  const boton=$("leer-foto"); boton.disabled=true; boton.textContent="Leyendo 1/5…";
-  $("ocr-progreso").className="editor-message message-info";
+
+  const boton = $("leer-foto");
+  boton.disabled = true;
+  boton.textContent = "Leyendo 1/30…";
+  $("ocr-progreso").className = "editor-message message-info";
   let worker;
   try {
-    worker = await Tesseract.createWorker("spa", 1, { logger: p => {
-      if (p.status === "recognizing text") $("ocr-progreso").textContent = `OCR por columnas… ${Math.round((p.progress||0)*100)}%`;
-    }});
-    const textos=[];
-    for (let i=0;i<5;i++) {
-      boton.textContent=`Leyendo ${i+1}/5…`;
-      $("ocr-progreso").textContent=`Leyendo ${nombreDiaDesdeIndice(i).toLowerCase()}…`;
-      const { data } = await worker.recognize(crearCanvasColumna(i));
-      textos.push((data?.text||"").trim());
+    worker = await Tesseract.createWorker("spa", 1, {
+      logger: p => {
+        if (p.status === "recognizing text") {
+          $("ocr-progreso").textContent = `Leyendo celda… ${Math.round((p.progress || 0) * 100)}%`;
+        }
+      }
+    });
+    await worker.setParameters({
+      tessedit_pageseg_mode: "7",
+      preserve_interword_spaces: "1"
+    });
+
+    const dias = Array.from({ length: 5 }, () => ({
+      primeros: ["", "", ""],
+      segundos: ["", "", ""],
+      dieta: ["Primero de dieta", "Carne plancha", "Pescado plancha"]
+    }));
+
+    let paso = 0;
+    for (let dia = 0; dia < 5; dia++) {
+      for (let plato = 0; plato < 6; plato++) {
+        paso += 1;
+        boton.textContent = `Leyendo ${paso}/30…`;
+        const grupo = plato < 3 ? "primeros" : "segundos";
+        const posicion = plato % 3;
+        $("ocr-progreso").textContent = `${nombreDiaDesdeIndice(dia)} · ${grupo === "primeros" ? "primer" : "segundo"} ${posicion + 1}`;
+        const { data } = await worker.recognize(crearCanvasCelda(dia, plato));
+        dias[dia][grupo][posicion] = limpiarTextoCelda(data?.text || "");
+      }
     }
-    pintarFormularioDias(textos.map(parsearTextoDia));
-    $("revision-ocr").hidden=false; $("resultado-importacion").hidden=true;
-    $("ocr-progreso").textContent="Lectura por días terminada. Revisa cada columna.";
-    $("ocr-progreso").className="editor-message message-success";
-    $("revision-ocr").scrollIntoView({behavior:"smooth",block:"start"});
-  } catch(error) {
+
+    pintarFormularioDias(dias);
+    $("revision-ocr").hidden = false;
+    $("resultado-importacion").hidden = true;
+    const vacios = dias.reduce((total, dia) => total + [...dia.primeros, ...dia.segundos].filter(x => !x).length, 0);
+    $("ocr-progreso").textContent = vacios
+      ? `Lectura terminada. Revisa los platos: quedan ${vacios} campos sin reconocer.`
+      : "Lectura por celdas terminada. Revisa los 30 platos antes de preparar la semana.";
+    $("ocr-progreso").className = vacios ? "editor-message message-info" : "editor-message message-success";
+    $("revision-ocr").scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (error) {
     console.error(error);
-    $("ocr-progreso").textContent="No se pudo completar el OCR. Ajusta el recorte o crea una plantilla manual.";
-    $("ocr-progreso").className="editor-message message-error";
+    $("ocr-progreso").textContent = "No se pudo completar el OCR. Ajusta el recorte o crea una plantilla manual.";
+    $("ocr-progreso").className = "editor-message message-error";
   } finally {
-    await worker?.terminate?.(); boton.disabled=false; boton.textContent="Leer 5 días";
+    await worker?.terminate?.();
+    boton.disabled = false;
+    boton.textContent = "Leer 30 celdas";
   }
 }
 
