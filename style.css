@@ -1593,3 +1593,54 @@ input {
   .ocr-row-resolved { animation: none; }
   .ocr-progress span, .ocr-summary, #preparar-semana { transition: none; }
 }
+
+/* V11 · revisión guiada */
+.ocr-confidence-badge {
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  line-height: 1;
+  pointer-events: auto !important;
+  transition: transform .15s ease, filter .15s ease;
+}
+.ocr-confidence-badge:active { transform: translateY(-50%) scale(.96) !important; }
+.ocr-confidence-badge:focus-visible { outline: 3px solid rgba(227,6,19,.22); outline-offset: 2px; }
+.guided-review-bar {
+  position: fixed;
+  z-index: 1200;
+  left: max(12px, env(safe-area-inset-left));
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: min(760px, calc(100vw - 24px));
+  margin-inline: auto;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--card, #fff) 92%, transparent);
+  box-shadow: 0 18px 55px rgba(0,0,0,.22);
+  backdrop-filter: blur(18px);
+}
+.guided-review-bar[hidden] { display: none; }
+.guided-review-copy { display: grid; gap: 2px; min-width: 0; }
+.guided-review-copy strong { font-size: 14px; }
+.guided-review-copy span { color: var(--muted); font-size: 12px; font-weight: 700; }
+.guided-review-actions { display: flex; gap: 8px; flex: 0 0 auto; }
+.guided-review-actions button { min-height: 42px; padding: 0 14px; border-radius: 14px; }
+body.guided-review-open { padding-bottom: 96px; }
+.ocr-field-shake { animation: fieldShake .28s ease; }
+.review-complete-pop { animation: reviewCompletePop .65s ease; }
+@keyframes fieldShake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }
+@keyframes reviewCompletePop { 0%{transform:scale(1)} 45%{transform:scale(1.018)} 100%{transform:scale(1)} }
+@media (max-width: 620px) {
+  .guided-review-bar { align-items: stretch; flex-direction: column; gap: 9px; }
+  .guided-review-actions { display: grid; grid-template-columns: .8fr 1.4fr; }
+  .guided-review-actions button { width: 100%; }
+  body.guided-review-open { padding-bottom: 150px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ocr-field-shake, .review-complete-pop { animation: none; }
+}

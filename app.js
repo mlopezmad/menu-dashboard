@@ -10,6 +10,8 @@ let borradorImportacion = null;
 let comparacionImportacion = null;
 let fuenteImportacion = null;
 let urlPreviewImportacion = null;
+let revisionGuiadaActiva = false;
+let campoRevisionActivo = null;
 let limitesFilasDetectados = null;
 const CALIBRATION_KEY = "menuDashboardCalibrationV6";
 
@@ -578,6 +580,112 @@ function leerFormularioDias() {
   }));
 }
 
+
+function marcarCampoComoRevisado(input, { aprender = true } = {}) {
+  const fila = input?.closest(".ocr-structured-row");
+  if (!fila || !input.value.trim()) return false;
+  const estabaPendiente = fila.classList.contains("ocr-needs-review");
+  fila.classList.remove("ocr-needs-review", "ocr-confidence-media", "ocr-confidence-baja");
+  fila.classList.add("ocr-confidence-alta");
+  fila.querySelector(".ocr-confidence-badge")?.remove();
+  if (aprender) aprenderCorreccionOcr(input.dataset.ocrOriginal || "", input.value);
+  actualizarEstadoRevision({ animarFila: estabaPendiente ? fila : null });
+  return estabaPendiente;
+}
+
+function enfocarCampoRevision(input, { seleccionar = true } = {}) {
+  if (!input) return;
+  campoRevisionActivo = input;
+  input.scrollIntoView({ behavior: "smooth", block: "center" });
+  window.setTimeout(() => {
+    input.focus({ preventScroll: true });
+    if (seleccionar) input.select();
+    mostrarBarraRevisionGuiada();
+  }, 320);
+}
+
+function siguienteCampoPendiente(desde = campoRevisionActivo) {
+  const pendientes = camposPendientesRevision();
+  if (!pendientes.length) {
+    cerrarRevisionGuiada(true);
+    return null;
+  }
+  const indice = desde ? pendientes.indexOf(desde) : -1;
+  return pendientes[indice >= 0 && indice < pendientes.length - 1 ? indice + 1 : 0];
+}
+
+function confirmarYSiguiente(input = campoRevisionActivo) {
+  if (!input) return;
+  if (!input.value.trim()) {
+    input.focus();
+    input.classList.remove("ocr-field-shake");
+    void input.offsetWidth;
+    input.classList.add("ocr-field-shake");
+    return;
+  }
+  marcarCampoComoRevisado(input);
+  const siguiente = siguienteCampoPendiente(input);
+  if (siguiente) enfocarCampoRevision(siguiente);
+}
+
+function asegurarBarraRevisionGuiada() {
+  let barra = document.getElementById("guided-review-bar");
+  if (barra) return barra;
+  barra = document.createElement("div");
+  barra.id = "guided-review-bar";
+  barra.className = "guided-review-bar";
+  barra.hidden = true;
+  barra.innerHTML = `
+    <div class="guided-review-copy">
+      <strong id="guided-review-title">Revisión guiada</strong>
+      <span id="guided-review-progress"></span>
+    </div>
+    <div class="guided-review-actions">
+      <button type="button" id="guided-review-close" class="secondary-action">Cerrar</button>
+      <button type="button" id="guided-review-next" class="primary-action">Aceptar y siguiente</button>
+    </div>`;
+  document.body.appendChild(barra);
+  barra.querySelector("#guided-review-close").addEventListener("click", () => cerrarRevisionGuiada(false));
+  barra.querySelector("#guided-review-next").addEventListener("click", () => confirmarYSiguiente());
+  return barra;
+}
+
+function mostrarBarraRevisionGuiada() {
+  if (!revisionGuiadaActiva) return;
+  const barra = asegurarBarraRevisionGuiada();
+  const pendientes = camposPendientesRevision();
+  const total = Number(barra.dataset.total || pendientes.length);
+  const resueltos = Math.max(0, total - pendientes.length);
+  barra.querySelector("#guided-review-progress").textContent = pendientes.length
+    ? `${resueltos + 1} de ${total} · ${pendientes.length} pendientes`
+    : `${total} de ${total} · completado`;
+  barra.hidden = false;
+  document.body.classList.add("guided-review-open");
+}
+
+function iniciarRevisionGuiada(inputInicial = null) {
+  const pendientes = camposPendientesRevision();
+  if (!pendientes.length) return;
+  revisionGuiadaActiva = true;
+  const barra = asegurarBarraRevisionGuiada();
+  barra.dataset.total = String(pendientes.length);
+  enfocarCampoRevision(inputInicial || pendientes[0]);
+}
+
+function cerrarRevisionGuiada(completada = false) {
+  revisionGuiadaActiva = false;
+  campoRevisionActivo = null;
+  const barra = document.getElementById("guided-review-bar");
+  if (barra) barra.hidden = true;
+  document.body.classList.remove("guided-review-open");
+  if (completada) {
+    const resumen = $("ocr-resumen");
+    resumen?.classList.add("review-complete-pop");
+    window.setTimeout(() => resumen?.classList.remove("review-complete-pop"), 700);
+    if (navigator.vibrate) navigator.vibrate(35);
+  }
+}
+
 function actualizarEstadoRevision({ animarFila = null } = {}) {
   const filas = Array.from(document.querySelectorAll(".ocr-structured-row"));
   if (!filas.length) return;
@@ -622,6 +730,11 @@ function actualizarEstadoRevision({ animarFila = null } = {}) {
   if (boton) {
     boton.classList.toggle("is-ready", pendientes === 0);
     boton.textContent = pendientes === 0 ? "✓ Menú listo · Preparar semana" : `Preparar semana · ${pendientes} pendientes`;
+  }
+
+  if (revisionGuiadaActiva) {
+    if (pendientes === 0) cerrarRevisionGuiada(true);
+    else mostrarBarraRevisionGuiada();
   }
 
   if (animarFila) {
@@ -693,22 +806,37 @@ function pintarFormularioDias(dias, diagnostico = null) {
           input.title = `Confianza ${info.puntuacion ?? Math.round(info.confianza || 0)}%${detalle}`;
           input.setAttribute("aria-label", `${input.placeholder}. Confianza ${nivel}${detalle}`);
           if (nivel !== "alta") {
-            const badge = document.createElement("small");
+            const badge = document.createElement("button");
+            badge.type = "button";
             badge.className = "ocr-confidence-badge";
             badge.textContent = "Revisar";
+            badge.setAttribute("aria-label", `Revisar ${input.placeholder}`);
+            badge.addEventListener("click", event => {
+              event.preventDefault();
+              iniciarRevisionGuiada(input);
+            });
             input.dataset.confidenceLabel = badge.textContent;
             fila._confidenceBadge = badge;
           }
         }
         input.addEventListener("input", () => {
           if (input.value.trim()) {
-            const estabaPendiente = fila.classList.contains("ocr-needs-review");
-            fila.classList.remove("ocr-needs-review", "ocr-confidence-media", "ocr-confidence-baja");
-            fila.classList.add("ocr-confidence-alta");
-            fila.querySelector(".ocr-confidence-badge")?.remove();
-            actualizarEstadoRevision({ animarFila: estabaPendiente ? fila : null });
+            marcarCampoComoRevisado(input, { aprender: false });
           } else {
+            fila.classList.add("ocr-needs-review", "ocr-confidence-baja");
             actualizarEstadoRevision();
+          }
+          mostrarBarraRevisionGuiada();
+        });
+        input.addEventListener("focus", () => {
+          campoRevisionActivo = input;
+          mostrarBarraRevisionGuiada();
+        });
+        input.addEventListener("keydown", event => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            if (!revisionGuiadaActiva && fila.classList.contains("ocr-needs-review")) iniciarRevisionGuiada(input);
+            confirmarYSiguiente(input);
           }
         });
         input.addEventListener("change", () => aprenderCorreccionOcr(input.dataset.ocrOriginal || "", input.value));
@@ -756,8 +884,7 @@ function abrirAsistenteRevision() {
   boton.onclick = () => {
     dialogo.close();
     const primero = camposPendientesRevision()[0];
-    primero?.scrollIntoView({ behavior: "smooth", block: "center" });
-    setTimeout(() => primero?.focus(), 350);
+    iniciarRevisionGuiada(primero);
   };
   dialogo.showModal();
   return true;

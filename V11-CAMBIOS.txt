@@ -1,0 +1,10 @@
+MENÚ DASHBOARD · V11 · REVISIÓN GUIADA
+
+- El botón Revisar ahora inicia un recorrido guiado por los platos pendientes.
+- Los chips Revisar son pulsables y abren directamente el campo correspondiente.
+- El texto del campo se selecciona automáticamente y se abre el teclado en móvil.
+- Barra inferior con progreso, Cerrar y Aceptar y siguiente.
+- La tecla Intro confirma el campo y avanza al siguiente pendiente.
+- Contador y barra de progreso se actualizan en tiempo real.
+- Al resolver el último plato se cierra la revisión, vibra brevemente y muestra Menú listo.
+- OCR, calibración, recortes, editor y publicación no se modifican.
