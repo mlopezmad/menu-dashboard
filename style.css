@@ -1714,3 +1714,14 @@ body.guided-review-open { padding-bottom: 96px; }
   .week-state.is-complete, .week-status.is-complete { color: #73df96; background: rgba(41,173,88,.18); }
   .week-state.is-partial, .week-status.is-partial { color: #ffbd61; background: rgba(255,149,0,.18); }
 }
+
+
+/* V11.3 · Menos falsos avisos y foto visible durante la revisión */
+.review-reference-card { position: sticky; top: 10px; z-index: 5; margin-top: 18px; box-shadow: 0 14px 34px rgba(17,17,17,.12); }
+.review-reference-viewport { height: 240px; }
+@media (max-width: 720px) {
+  .review-reference-card { top: max(8px, env(safe-area-inset-top)); padding: 14px; border-radius: 18px; }
+  .review-reference-card .reference-heading { margin-bottom: 10px; }
+  .review-reference-card .reference-heading h3 { font-size: 16px; }
+  .review-reference-viewport { height: 170px; }
+}

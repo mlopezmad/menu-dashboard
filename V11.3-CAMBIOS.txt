@@ -1,0 +1,9 @@
+MENÚ DASHBOARD · V11.3
+
+- Reduce falsos avisos Revisar en textos completos y coherentes.
+- Reconoce como correctos los platos que coinciden con el histórico o el diccionario.
+- Mantiene Revisar en textos cortados, vacíos, muy cortos o con caracteres dudosos.
+- Muestra la foto original durante la revisión OCR.
+- La foto puede ampliarse sin salir del Dashboard.
+- Conserva la referencia durante la sesión y al pasar al editor semanal o diario.
+- No modifica la calibración, la publicación ni menu.json.

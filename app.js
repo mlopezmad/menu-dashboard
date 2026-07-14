@@ -18,6 +18,32 @@ let revisionGuiadaActiva = false;
 let campoRevisionActivo = null;
 let limitesFilasDetectados = null;
 const CALIBRATION_KEY = "menuDashboardCalibrationV6";
+const REFERENCE_SESSION_KEY = "menuDashboardReferenceV113";
+
+function guardarReferenciaSesion() {
+  try {
+    if (!imagenReferenciaImportacion) { sessionStorage.removeItem(REFERENCE_SESSION_KEY); return; }
+    sessionStorage.setItem(REFERENCE_SESSION_KEY, JSON.stringify({
+      imagen: imagenReferenciaImportacion,
+      fechas: [...fechasReferenciaImportacion]
+    }));
+  } catch {}
+}
+
+function restaurarReferenciaSesion() {
+  try {
+    const datos = JSON.parse(sessionStorage.getItem(REFERENCE_SESSION_KEY) || "null");
+    if (!datos?.imagen) return;
+    imagenReferenciaImportacion = datos.imagen;
+    fechasReferenciaImportacion = new Set(Array.isArray(datos.fechas) ? datos.fechas : []);
+  } catch {}
+}
+
+function limpiarReferenciaSesion() {
+  imagenReferenciaImportacion = null;
+  fechasReferenciaImportacion = new Set();
+  try { sessionStorage.removeItem(REFERENCE_SESSION_KEY); } catch {}
+}
 
 function fechaDesdeClave(clave) {
   const [year, month, day] = clave.split("-").map(Number);
@@ -459,6 +485,7 @@ function crearPlantillaSemana() {
   }
   pintarFormularioDias(Array.from({ length: 5 }, () => ({ primeros: ["", "", ""], segundos: ["", "", ""] })));
   $("revision-ocr").hidden = false;
+  actualizarReferenciaRevision();
   $("resultado-importacion").hidden = true;
 }
 
@@ -564,6 +591,17 @@ function similitudTokens(a, b) {
   return comun / Math.max(ta.size, tb.size);
 }
 
+function esTextoOcrCoherente(texto) {
+  const valor = String(texto || "").trim();
+  const normal = normalizarOcr(valor).replace(/\s+/g, " ").trim();
+  const palabras = normal.split(" ").filter(Boolean);
+  const letras = (normal.match(/[A-ZÑ]/g) || []).length;
+  const raros = (valor.match(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ\s'’.-]/g) || []).length;
+  const truncado = /(?:\.{2,}|…)$/.test(valor) || /\b(?:A|AL|DE|DEL|CON|EN|LA|LAS|LOS|Y)$/i.test(valor);
+  const tieneVocal = /[AEIOUÁÉÍÓÚÜ]/i.test(valor);
+  return !truncado && tieneVocal && letras >= 9 && palabras.length >= 2 && raros <= 1;
+}
+
 function interpretarTextoOcr(texto, confianza = 0, tipo = "primeros") {
   const limpio = limpiarLineaOcr(texto);
   const normal = normalizarOcr(limpio).replace(/\s+/g, " ").trim();
@@ -574,29 +612,45 @@ function interpretarTextoOcr(texto, confianza = 0, tipo = "primeros") {
   if (!limpio) return { texto: "", original: "", sugerencia: "", nivel: "baja", puntuacion: 0 };
 
   let mejor = "", mejorPuntuacion = 0, mejorRatio = 1;
+  let coincidenciaExacta = "";
   for (const plato of platosPorTipo(tipo)) {
-    const np = normalizarOcr(plato);
+    const np = normalizarOcr(plato).replace(/\s+/g, " ").trim();
+    if (np === normal) coincidenciaExacta = plato;
     const ratio = distanciaLevenshtein(normal, np) / Math.max(normal.length, np.length, 1);
     const lev = 1 - ratio;
     const tokens = similitudTokens(limpio, plato);
     const contiene = normal.length >= 5 && (np.includes(normal) || normal.includes(np)) ? 0.18 : 0;
     const puntuacion = Math.min(1, lev * 0.72 + tokens * 0.28 + contiene);
     if (puntuacion > mejorPuntuacion) {
-      mejorPuntuacion = puntuacion;
-      mejorRatio = ratio;
-      mejor = plato;
+      mejorPuntuacion = puntuacion; mejorRatio = ratio; mejor = plato;
     }
   }
 
-  const letras = (normal.match(/[A-Z]/g) || []).length;
-  const demasiadoCorto = letras < 5 || normal.split(/\s+/).filter(Boolean).length < 2;
-  const autoCorregir = !demasiadoCorto && (mejorPuntuacion >= 0.79 || mejorRatio <= 0.28);
-  const sugerir = !demasiadoCorto && (mejorPuntuacion >= 0.62 || mejorRatio <= 0.42);
-  const textoFinal = autoCorregir ? mejor : limpio
+  if (coincidenciaExacta) {
+    return { texto: coincidenciaExacta, original: limpio, sugerencia: "", nivel: "alta", puntuacion: Math.max(92, Math.round(confianza)), aprendido: false };
+  }
+
+  const palabras = normal.split(/\s+/).filter(Boolean);
+  const letras = (normal.match(/[A-ZÑ]/g) || []).length;
+  const demasiadoCorto = letras < 5 || palabras.length < 2;
+  const coherente = esTextoOcrCoherente(limpio);
+  const autoCorregir = !demasiadoCorto && (mejorPuntuacion >= 0.76 || mejorRatio <= 0.25);
+  const sugerir = !demasiadoCorto && (mejorPuntuacion >= 0.60 || mejorRatio <= 0.40);
+  const textoBase = autoCorregir ? mejor : limpio;
+  const textoFinal = textoBase
     .toLocaleLowerCase("es-ES")
     .replace(/(^|\s)([a-záéíóúüñ])/g, (_, a, b) => a + b.toLocaleUpperCase("es-ES"));
-  const puntuacion = Math.round(Math.max(0, Math.min(100, confianza * 0.48 + mejorPuntuacion * 52)));
-  const nivel = !textoFinal || demasiadoCorto || puntuacion < 48 ? "baja" : puntuacion < 76 || (sugerir && !autoCorregir) ? "media" : "alta";
+  let puntuacion = Math.round(Math.max(0, Math.min(100, confianza * 0.42 + mejorPuntuacion * 58)));
+  if (coherente) puntuacion = Math.max(puntuacion, 78);
+  if (autoCorregir) puntuacion = Math.max(puntuacion, 86);
+
+  let nivel;
+  if (!textoFinal || demasiadoCorto) nivel = "baja";
+  else if (coherente && !(sugerir && !autoCorregir && mejorRatio > 0.32)) nivel = "alta";
+  else if (puntuacion >= 76 || autoCorregir) nivel = "alta";
+  else if (puntuacion >= 48) nivel = "media";
+  else nivel = "baja";
+
   return { texto: textoFinal, original: limpio, sugerencia: sugerir ? mejor : "", nivel, puntuacion, aprendido: false };
 }
 
@@ -1095,6 +1149,7 @@ function aplicarSemanaAlEditor() {
   }
   if (!fechasAplicadas.length) return;
   fechasReferenciaImportacion = new Set(fechasAplicadas);
+  guardarReferenciaSesion();
   fechaActiva = fechasAplicadas.sort()[0];
   cargarSelectorFechas(menuTrabajo, fechaActiva);
   cambiarVista("vista-editor"); mostrarMenuDeFecha(fechaActiva); actualizarEstadoCambios();
@@ -1111,6 +1166,8 @@ function prepararImagenReferencia() {
     canvas.height = Math.max(1, Math.round(fuenteImportacion.height * escala));
     canvas.getContext("2d", { alpha: false }).drawImage(fuenteImportacion, 0, 0, canvas.width, canvas.height);
     imagenReferenciaImportacion = canvas.toDataURL("image/jpeg", 0.86);
+    guardarReferenciaSesion();
+    actualizarReferenciaRevision();
   } catch { imagenReferenciaImportacion = null; }
 }
 
@@ -1120,6 +1177,15 @@ function actualizarReferenciaEditor() {
   panel.hidden = !disponible;
   if (!disponible) return;
   $("editor-referencia-img").src = imagenReferenciaImportacion;
+  $("reference-dialog-img").src = imagenReferenciaImportacion;
+}
+
+function actualizarReferenciaRevision() {
+  const panel = $("revision-referencia");
+  if (!panel) return;
+  panel.hidden = !imagenReferenciaImportacion;
+  if (!imagenReferenciaImportacion) return;
+  $("revision-referencia-img").src = imagenReferenciaImportacion;
   $("reference-dialog-img").src = imagenReferenciaImportacion;
 }
 
@@ -1486,6 +1552,7 @@ async function leerFotoConOcr() {
 
     pintarFormularioDias(dias, diagnostico);
     $("revision-ocr").hidden = false;
+    actualizarReferenciaRevision();
     $("resultado-importacion").hidden = true;
     const vacios = dias.reduce((total, dia) => total + [...dia.primeros, ...dia.segundos].filter(x => !x).length, 0);
     const dudosos = diagnostico.reduce((total, dia) => total + [...dia.primeros, ...dia.segundos].filter(x => x?.revisar).length, 0);
@@ -1510,7 +1577,7 @@ async function leerFotoConOcr() {
 async function fotoSeleccionada() {
   const archivo=$("foto-menu").files?.[0];
   $("leer-foto").disabled=!archivo; $("revision-ocr").hidden=true; $("resultado-importacion").hidden=true;
-  if (!archivo) { fuenteImportacion=null; imagenReferenciaImportacion=null; fechasReferenciaImportacion = new Set(); limitesFilasDetectados=null; $("recorte-panel").hidden=true; return; }
+  if (!archivo) { fuenteImportacion=null; limpiarReferenciaSesion(); limitesFilasDetectados=null; $("recorte-panel").hidden=true; actualizarReferenciaRevision(); return; }
   $("ocr-progreso").textContent="Preparando vista previa…"; $("ocr-progreso").className="editor-message message-info";
   try {
     fuenteImportacion=await cargarFuenteImagen(archivo); limitesFilasDetectados=null;
@@ -1578,9 +1645,10 @@ function prepararEventos() {
   $("publicar-menu").addEventListener("click", publicarMenu);
   $("ampliar-referencia").addEventListener("click", abrirReferencia);
   $("ampliar-referencia-semana").addEventListener("click", abrirReferencia);
+  $("ampliar-referencia-revision").addEventListener("click", abrirReferencia);
   $("cerrar-referencia").addEventListener("click", cerrarReferencia);
   $("reference-dialog").addEventListener("click", event => { if (event.target === $("reference-dialog")) cerrarReferencia(); });
   window.addEventListener("beforeunload", event => { if (hayCambios) { event.preventDefault(); event.returnValue = ""; } });
 }
 
-document.addEventListener("DOMContentLoaded", () => { prepararEventos(); cargarMenuPublicado(); });
+document.addEventListener("DOMContentLoaded", () => { restaurarReferenciaSesion(); prepararEventos(); actualizarReferenciaRevision(); cargarMenuPublicado(); });
