@@ -1,0 +1,9 @@
+MENÚ DASHBOARD V8 · REVISIÓN COMPACTA
+
+- Oculta los indicadores “Alta” en platos reconocidos correctamente.
+- Muestra “Revisar” únicamente en lecturas de confianza media o baja.
+- Coloca el aviso a la derecha del plato, en la misma línea.
+- Reduce el espacio vertical entre platos.
+- Mantiene el recuadro de atención solo en campos dudosos.
+- Añade un resumen superior con platos detectados, correctos y pendientes de revisión.
+- No modifica OCR, calibración, recortes, editor ni publicación.

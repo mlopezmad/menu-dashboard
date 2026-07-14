@@ -581,6 +581,36 @@ function leerFormularioDias() {
 function pintarFormularioDias(dias, diagnostico = null) {
   const contenedor = $("ocr-dias");
   contenedor.innerHTML = "";
+
+  const revision = $("revision-ocr");
+  let resumen = $("ocr-resumen");
+  if (!resumen) {
+    resumen = document.createElement("div");
+    resumen.id = "ocr-resumen";
+    resumen.className = "ocr-summary";
+    revision?.insertBefore(resumen, contenedor);
+  }
+
+  const niveles = { alta: 0, media: 0, baja: 0 };
+  if (diagnostico) {
+    diagnostico.forEach(dia => {
+      for (const tipo of ["primeros", "segundos"]) {
+        (dia?.[tipo] || []).forEach(info => {
+          const nivel = info?.nivel || (info?.revisar ? "media" : "alta");
+          niveles[nivel] = (niveles[nivel] || 0) + 1;
+        });
+      }
+    });
+  } else {
+    niveles.alta = dias.length * 6;
+  }
+  const total = niveles.alta + niveles.media + niveles.baja;
+  resumen.innerHTML = `
+    <strong>${total} platos detectados</strong>
+    <span>${niveles.alta} correctos</span>
+    <span class="summary-review">${niveles.media + niveles.baja} para revisar</span>
+  `;
+
   dias.forEach((dia, indice) => {
     const bloque = document.createElement("article");
     bloque.className = "ocr-day-card";
@@ -605,11 +635,13 @@ function pintarFormularioDias(dias, diagnostico = null) {
           const detalle = info.sugerencia && info.sugerencia !== input.value ? ` · Sugerencia: ${info.sugerencia}` : "";
           input.title = `Confianza ${info.puntuacion ?? Math.round(info.confianza || 0)}%${detalle}`;
           input.setAttribute("aria-label", `${input.placeholder}. Confianza ${nivel}${detalle}`);
-          const badge = document.createElement("small");
-          badge.className = "ocr-confidence-badge";
-          badge.textContent = nivel === "alta" ? "Alta" : nivel === "media" ? "Revisar" : "Baja";
-          input.dataset.confidenceLabel = badge.textContent;
-          fila._confidenceBadge = badge;
+          if (nivel !== "alta") {
+            const badge = document.createElement("small");
+            badge.className = "ocr-confidence-badge";
+            badge.textContent = "Revisar";
+            input.dataset.confidenceLabel = badge.textContent;
+            fila._confidenceBadge = badge;
+          }
         }
         input.addEventListener("input", () => {
           fila.classList.remove("ocr-needs-review", "ocr-confidence-media", "ocr-confidence-baja");

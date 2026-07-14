@@ -1429,3 +1429,57 @@ input {
   .ocr-structured-row { row-gap: 5px; }
   .ocr-structured-row input { grid-column: 2; }
 }
+
+
+/* V8 · revisión compacta: solo destacar lo que requiere atención */
+.ocr-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--field);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 750;
+}
+.ocr-summary strong { color: var(--text); font-size: 15px; margin-right: auto; }
+.ocr-summary .summary-review { color: #9a5b00; }
+.ocr-structured-list { gap: 5px; }
+.ocr-structured-row {
+  grid-template-columns: 32px minmax(0,1fr) auto;
+  gap: 8px;
+  min-height: 46px;
+}
+.ocr-structured-row input {
+  border-color: transparent;
+  background: transparent;
+  padding: 9px 4px;
+  border-radius: 12px;
+}
+.ocr-structured-row:not(.ocr-needs-review) input:hover { background: rgba(127,127,127,.055); }
+.ocr-structured-row.ocr-needs-review input { padding: 11px 12px; }
+.ocr-confidence-badge {
+  justify-self: end;
+  white-space: nowrap;
+  min-width: auto;
+  padding: 5px 8px;
+}
+.ocr-confidence-media .ocr-confidence-badge { background: #fff4d6; color: #8a5a00; }
+.ocr-confidence-baja .ocr-confidence-badge { background: #ffe6e6; color: #a81d1d; }
+@media (max-width: 520px) {
+  .ocr-day-card { padding: 17px 16px; }
+  .ocr-day-card h4 { margin: 14px 0 7px; }
+  .ocr-structured-row { grid-template-columns: 28px minmax(0,1fr) auto; gap: 7px; min-height: 43px; }
+  .ocr-structured-row input { grid-column: 2; padding: 8px 3px; }
+  .ocr-structured-row.ocr-needs-review input { padding: 10px 11px; }
+  .ocr-confidence-badge { grid-column: 3; grid-row: 1; align-self: center; margin: 0; }
+  .ocr-summary { padding: 12px 13px; gap: 6px 10px; }
+  .ocr-summary strong { width: 100%; }
+}
+@media (prefers-color-scheme: dark) {
+  .ocr-summary .summary-review { color: #ffd18a; }
+}
