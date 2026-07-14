@@ -604,6 +604,37 @@ function esTextoOcrCoherente(texto) {
   return !truncado && tieneVocal && letras >= 9 && palabras.length >= 2 && raros <= 1;
 }
 
+
+function analizarAnomaliasOcr(texto) {
+  const valor = String(texto || "").trim();
+  const normal = normalizarOcr(valor).replace(/\s+/g, " ").trim();
+  const palabras = normal.split(" ").filter(Boolean);
+  if (!normal) return { sospechoso: true, motivos: ["vacio"] };
+
+  const motivos = [];
+  const raros = (valor.match(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ\s'’.-]/g) || []).length;
+  if (raros > 0) motivos.push("simbolos");
+  if (/(?:\.{2,}|…)$/i.test(valor)) motivos.push("truncado");
+  if (/\b(?:A|AL|DE|DEL|CON|EN|LA|LAS|LOS|Y)$/i.test(valor)) motivos.push("final-incompleto");
+  if (/\b[A-ZÑ]{1,2}\b/.test(normal) && palabras.length <= 3) motivos.push("fragmento-corto");
+
+  const deformaciones = [
+    /\b(?:HAC|MS|MUA|COP0|COPO|ATUSM|TOMAJE|HORNI|ESPUIACIS|ESPUIACAS|SAJOMIA|PECCHUGA|MARMITAKODEL?)\b/,
+    /[BCDFGHJKLMNPQRSTVWXYZÑ]{5,}/,
+    /\b[A-ZÑ]{2,4}(?:M|J|C|G|Q|X|Z)\b/
+  ];
+  if (deformaciones.some(r => r.test(normal))) motivos.push("palabra-deformada");
+
+  for (const palabra of palabras) {
+    if (palabra.length >= 5) {
+      const vocales = (palabra.match(/[AEIOUÁÉÍÓÚÜ]/g) || []).length;
+      if (vocales === 0 || vocales / palabra.length < 0.16) motivos.push("palabra-improbable");
+      if (/(.)\1\1/.test(palabra)) motivos.push("repeticion");
+    }
+  }
+  return { sospechoso: motivos.length > 0, motivos: [...new Set(motivos)] };
+}
+
 function interpretarTextoOcr(texto, confianza = 0, tipo = "primeros") {
   const limpio = limpiarLineaOcr(texto);
   const normal = normalizarOcr(limpio).replace(/\s+/g, " ").trim();
@@ -636,24 +667,27 @@ function interpretarTextoOcr(texto, confianza = 0, tipo = "primeros") {
   const letras = (normal.match(/[A-ZÑ]/g) || []).length;
   const demasiadoCorto = letras < 5 || palabras.length < 2;
   const coherente = esTextoOcrCoherente(limpio);
-  const autoCorregir = !demasiadoCorto && (mejorPuntuacion >= 0.76 || mejorRatio <= 0.25);
+  const anomalias = analizarAnomaliasOcr(limpio);
+  const autoCorregir = !demasiadoCorto && !anomalias.sospechoso && (mejorPuntuacion >= 0.76 || mejorRatio <= 0.25);
   const sugerir = !demasiadoCorto && (mejorPuntuacion >= 0.60 || mejorRatio <= 0.40);
   const textoBase = autoCorregir ? mejor : limpio;
   const textoFinal = textoBase
     .toLocaleLowerCase("es-ES")
     .replace(/(^|\s)([a-záéíóúüñ])/g, (_, a, b) => a + b.toLocaleUpperCase("es-ES"));
   let puntuacion = Math.round(Math.max(0, Math.min(100, confianza * 0.42 + mejorPuntuacion * 58)));
-  if (coherente) puntuacion = Math.max(puntuacion, 78);
+  if (coherente && !anomalias.sospechoso) puntuacion = Math.max(puntuacion, 78);
+  if (anomalias.sospechoso) puntuacion = Math.min(puntuacion, 45);
   if (autoCorregir) puntuacion = Math.max(puntuacion, 86);
 
   let nivel;
   if (!textoFinal || demasiadoCorto) nivel = "baja";
+  else if (anomalias.sospechoso) nivel = mejorPuntuacion >= 0.70 ? "media" : "baja";
   else if (coherente && !(sugerir && !autoCorregir && mejorRatio > 0.32)) nivel = "alta";
   else if (puntuacion >= 76 || autoCorregir) nivel = "alta";
   else if (puntuacion >= 48) nivel = "media";
   else nivel = "baja";
 
-  return { texto: textoFinal, original: limpio, sugerencia: sugerir ? mejor : "", nivel, puntuacion, aprendido: false };
+  return { texto: textoFinal, original: limpio, sugerencia: sugerir ? mejor : "", nivel, puntuacion, aprendido: false, motivosRevision: anomalias.motivos };
 }
 
 function diccionarioPlatos() {
@@ -665,7 +699,12 @@ function diccionarioPlatos() {
     "Lubina a la plancha", "Fabada asturiana", "Revuelto de morcilla", "Ensaladilla alemana", "Musaka",
     "Filete de cerdo a la madrileña", "Dorada a la plancha", "Arroz campero", "Crema de verduras",
     "Empanada de atún", "Callos a la madrileña", "Atún plancha", "Fideuá marinera", "Crema de calabacín",
-    "Huevos rotos con torreznillos", "Salchichas frescas encebolladas", "Colitas de rape en salsa"
+    "Huevos rotos con torreznillos", "Salchichas frescas encebolladas", "Colitas de rape en salsa",
+    "Panache de verduras", "Pasta con espinacas y bacon", "Ensalada italiana", "Lomo de Sajonia al horno",
+    "Pechuga de pollo al horno", "Salmón al horno", "Marmitako de calamar", "Acelgas rehogadas",
+    "Entrecot a la parrilla", "Salchichas a la mostaza y miel", "Merluza al horno", "Sopa de cocido",
+    "Alcachofas con jamón", "Ensalada de escarola", "Cocido completo", "Tortilla de patata",
+    "Arroz valenciano", "Chuletas de aguja al horno", "Burritos de pollo", "Atún con tomate"
   ];
   for (const dia of Object.values(menuPublicado?.dias || {})) {
     for (const tipo of ["primeros", "segundos"]) for (const plato of dia?.[tipo] || []) base.push(plato);
@@ -859,6 +898,9 @@ function iniciarRevisionGuiada(inputInicial = null) {
 function cerrarRevisionGuiada(completada = false) {
   revisionGuiadaActiva = false;
   campoRevisionActivo = null;
+  referenciaCeldaActiva = null;
+  const botonRef = $("referencia-flotante");
+  if (botonRef && $("revision-ocr") && !$("revision-ocr").hidden) botonRef.hidden = true;
   const barra = document.getElementById("guided-review-bar");
   if (barra) barra.hidden = true;
   document.body.classList.remove("guided-review-open");
@@ -1224,16 +1266,16 @@ function contextoCeldaReferencia(input = campoRevisionActivo) {
 function crearImagenCeldaReferencia(dia, plato) {
   if (!fuenteImportacion) return null;
   const g = geometriaCelda(dia, plato);
-  const margenX = Math.max(8, g.sw * .08);
-  const margenY = Math.max(6, g.sh * .28);
+  const margenX = Math.max(12, g.sw * .16);
+  const margenY = Math.max(10, g.sh * 1.15);
   const sx = Math.max(0, g.sx - margenX);
   const sy = Math.max(0, g.sy - margenY);
   const sw = Math.min(fuenteImportacion.width - sx, g.sw + margenX * 2);
   const sh = Math.min(fuenteImportacion.height - sy, g.sh + margenY * 2);
-  const escala = Math.min(5, Math.max(2.3, 1150 / Math.max(sw, 1)));
+  const escala = Math.min(3.2, Math.max(1.45, 900 / Math.max(sw, 1)));
   const canvas = document.createElement("canvas");
-  canvas.width = Math.max(720, Math.round(sw * escala));
-  canvas.height = Math.max(210, Math.round(sh * escala));
+  canvas.width = Math.max(640, Math.round(sw * escala));
+  canvas.height = Math.max(360, Math.round(sh * escala));
   const ctx = canvas.getContext("2d", { alpha: false });
   ctx.fillStyle = "#fff";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1254,8 +1296,13 @@ function crearImagenCeldaReferencia(dia, plato) {
 
 function actualizarReferenciaCeldaActiva(input = campoRevisionActivo) {
   referenciaCeldaActiva = contextoCeldaReferencia(input);
-  const texto = $("referencia-flotante")?.querySelector("span:last-child");
-  if (texto) texto.textContent = referenciaCeldaActiva ? "Ver celda" : "Ver menú";
+  const boton = $("referencia-flotante");
+  const texto = boton?.querySelector("span:last-child");
+  if (texto) texto.textContent = referenciaCeldaActiva ? "Ver original" : "Ver menú";
+  if (boton && $("revision-ocr") && !$("revision-ocr").hidden) {
+    boton.hidden = !imagenReferenciaImportacion || !referenciaCeldaActiva;
+    document.body.classList.toggle("reference-floating-open", !boton.hidden);
+  }
 }
 
 function mostrarModoReferencia(modo = referenciaModo) {

@@ -1,0 +1,9 @@
+V11.6 · Revisión estricta y visor contextual
+
+- Detecta y marca como Revisar textos OCR deformados, truncados o improbables.
+- Evita aceptar automáticamente errores como Horni, Tomaje, Copo Completo o Espuiacis.
+- Amplía el diccionario con platos reales observados en las pruebas.
+- El recorte de celda muestra más contexto: fila superior, plato activo y fila inferior.
+- El botón pasa a ser contextual: Ver original durante la corrección activa.
+- Mantiene acceso al menú completo.
+- No modifica calibración, publicación ni menu.json.
