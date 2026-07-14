@@ -498,7 +498,7 @@ function leerFormularioDias() {
   }));
 }
 
-function pintarFormularioDias(dias) {
+function pintarFormularioDias(dias, diagnostico = null) {
   const contenedor = $("ocr-dias");
   contenedor.innerHTML = "";
   dias.forEach((dia, indice) => {
@@ -515,6 +515,13 @@ function pintarFormularioDias(dias) {
         const numero = document.createElement("span"); numero.textContent = `${i + 1}`;
         const input = document.createElement("input"); input.type = "text"; input.dataset.tipo = tipo;
         input.value = dia?.[tipo]?.[i] || ""; input.placeholder = `${tipo === "primeros" ? "Primer" : "Segundo"} plato ${i + 1}`;
+        const info = diagnostico?.[indice]?.[tipo]?.[i];
+        if (info?.revisar) {
+          fila.classList.add("ocr-needs-review");
+          input.setAttribute("aria-label", `${input.placeholder}. Revisar lectura OCR`);
+          input.title = `Revisar lectura OCR · confianza ${Math.round(info.confianza || 0)}%`;
+        }
+        input.addEventListener("input", () => fila.classList.remove("ocr-needs-review"));
         fila.append(numero, input); lista.appendChild(fila);
       }
       bloque.appendChild(lista);
@@ -747,23 +754,114 @@ function geometriaCelda(indiceDia, indicePlato) {
   };
 }
 
-function crearCanvasCelda(indiceDia, indicePlato, procesar = true) {
+function crearCanvasCelda(indiceDia, indicePlato, modo = "binario") {
   const { sx, sy, sw, sh } = geometriaCelda(indiceDia, indicePlato);
-  const escala = procesar ? Math.max(3.5, 1350 / Math.max(sw, 1)) : Math.max(1.2, 420 / Math.max(sw, 1));
+  const procesar = modo !== "preview";
+  const escala = procesar ? Math.max(4.2, 1650 / Math.max(sw, 1)) : Math.max(1.2, 420 / Math.max(sw, 1));
+  const margen = procesar ? Math.max(22, Math.round(escala * 6)) : 0;
+  const anchoInterior = Math.max(procesar ? 720 : 260, Math.round(sw * escala));
+  const altoInterior = Math.max(procesar ? 210 : 90, Math.round(sh * escala));
   const canvas = document.createElement("canvas");
-  canvas.width = Math.max(procesar ? 650 : 260, Math.round(sw * escala));
-  canvas.height = Math.max(procesar ? 170 : 90, Math.round(sh * escala));
+  canvas.width = anchoInterior + margen * 2;
+  canvas.height = altoInterior + margen * 2;
   const ctx = canvas.getContext("2d", { alpha: false, willReadFrequently: true });
-  ctx.fillStyle = "#fff"; ctx.fillRect(0,0,canvas.width,canvas.height);
-  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
-  ctx.drawImage(fuenteImportacion, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(fuenteImportacion, sx, sy, sw, sh, margen, margen, anchoInterior, altoInterior);
   if (!procesar) return canvas;
+
   const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const d = image.data; let suma = 0;
-  for (let i = 0; i < d.length; i += 4) suma += 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
-  const media = suma / (d.length/4); const umbral = Math.max(145, Math.min(210, media - 20));
-  for (let i = 0; i < d.length; i += 4) { const g=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2]; const c=g>umbral?255:0; d[i]=d[i+1]=d[i+2]=c; }
-  ctx.putImageData(image,0,0); return canvas;
+  const d = image.data;
+  const grises = new Uint8ClampedArray(d.length / 4);
+  let suma = 0;
+  for (let i = 0, p = 0; i < d.length; i += 4, p++) {
+    // Contraste suave antes de binarizar. Conserva mejor las letras finas.
+    let g = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    g = Math.max(0, Math.min(255, (g - 128) * 1.35 + 128));
+    grises[p] = g;
+    suma += g;
+  }
+  const media = suma / grises.length;
+
+  for (let i = 0, p = 0; i < d.length; i += 4, p++) {
+    let c;
+    if (modo === "gris") {
+      c = grises[p];
+    } else {
+      // Umbral más conservador que evita convertir trazos finos en blanco.
+      const umbral = Math.max(150, Math.min(215, media - 10));
+      c = grises[p] > umbral ? 255 : 0;
+    }
+    d[i] = d[i + 1] = d[i + 2] = c;
+    d[i + 3] = 255;
+  }
+  ctx.putImageData(image, 0, 0);
+
+  // Borra posibles restos de las líneas de la tabla en el perímetro.
+  if (modo !== "gris") {
+    const borde = Math.max(8, Math.round(canvas.height * 0.035));
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, canvas.width, borde);
+    ctx.fillRect(0, canvas.height - borde, canvas.width, borde);
+    ctx.fillRect(0, 0, borde, canvas.height);
+    ctx.fillRect(canvas.width - borde, 0, borde, canvas.height);
+  }
+  return canvas;
+}
+
+function textoSospechosoOcr(texto, confianza = 0) {
+  const limpio = limpiarTextoCelda(texto);
+  const letras = (limpio.match(/[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/g) || []).length;
+  const palabras = limpio.split(/\s+/).filter(Boolean);
+  if (!limpio || letras < 5 || palabras.length < 2) return true;
+  if (confianza < 58) return true;
+  if (/^(O|NG|AA|NT|MII|MAI|AO)$/i.test(normalizarOcr(limpio))) return true;
+  return false;
+}
+
+function puntuacionCandidatoOcr(texto, confianza = 0) {
+  const limpio = limpiarTextoCelda(texto);
+  if (!limpio) return -1000;
+  const normal = normalizarOcr(limpio);
+  const palabras = normal.split(/\s+/).filter(Boolean).length;
+  let mejorRatio = 1;
+  for (const plato of diccionarioPlatos()) {
+    const r = distanciaLevenshtein(normal, plato) / Math.max(normal.length, normalizarOcr(plato).length, 1);
+    mejorRatio = Math.min(mejorRatio, r);
+  }
+  const longitudUtil = Math.min(1, normal.length / 24);
+  return confianza * 0.55 + (1 - mejorRatio) * 42 + palabras * 1.5 + longitudUtil * 5;
+}
+
+async function reconocerCelda(worker, dia, plato) {
+  const intento1 = await worker.recognize(crearCanvasCelda(dia, plato, "binario"));
+  const candidato1 = {
+    texto: limpiarTextoCelda(intento1?.data?.text || ""),
+    confianza: Number(intento1?.data?.confidence || 0),
+    modo: "binario"
+  };
+
+  let candidatos = [candidato1];
+  if (textoSospechosoOcr(candidato1.texto, candidato1.confianza)) {
+    // Un segundo intento en grises recupera trazos finos que la binarización puede perder.
+    const intento2 = await worker.recognize(crearCanvasCelda(dia, plato, "gris"));
+    candidatos.push({
+      texto: limpiarTextoCelda(intento2?.data?.text || ""),
+      confianza: Number(intento2?.data?.confidence || 0),
+      modo: "gris"
+    });
+  }
+
+  candidatos.sort((a, b) => puntuacionCandidatoOcr(b.texto, b.confianza) - puntuacionCandidatoOcr(a.texto, a.confianza));
+  const mejor = candidatos[0] || { texto: "", confianza: 0, modo: "binario" };
+  return {
+    texto: mejor.texto,
+    confianza: mejor.confianza,
+    revisar: textoSospechosoOcr(mejor.texto, mejor.confianza),
+    modo: mejor.modo
+  };
 }
 
 function verTreintaRecortes() {
@@ -774,7 +872,7 @@ function verTreintaRecortes() {
     for (let plato=0; plato<6; plato++) {
       const card=document.createElement("article"); card.className="cut-card";
       const title=document.createElement("strong"); title.textContent=`${nombreDiaDesdeIndice(dia)} · ${nombres[plato]}`;
-      const canvas=crearCanvasCelda(dia,plato,false); card.append(title,canvas); grid.appendChild(card);
+      const canvas=crearCanvasCelda(dia,plato,"preview"); card.append(title,canvas); grid.appendChild(card);
     }
   }
   $("vista-recortes").hidden=false;
@@ -834,6 +932,10 @@ async function leerFotoConOcr() {
       segundos: ["", "", ""],
       dieta: ["Primero de dieta", "Carne plancha", "Pescado plancha"]
     }));
+    const diagnostico = Array.from({ length: 5 }, () => ({
+      primeros: [null, null, null],
+      segundos: [null, null, null]
+    }));
 
     let paso = 0;
     for (let dia = 0; dia < 5; dia++) {
@@ -843,19 +945,23 @@ async function leerFotoConOcr() {
         const grupo = plato < 3 ? "primeros" : "segundos";
         const posicion = plato % 3;
         $("ocr-progreso").textContent = `${nombreDiaDesdeIndice(dia)} · ${grupo === "primeros" ? "primer" : "segundo"} ${posicion + 1}`;
-        const { data } = await worker.recognize(crearCanvasCelda(dia, plato));
-        dias[dia][grupo][posicion] = limpiarTextoCelda(data?.text || "");
+        const lectura = await reconocerCelda(worker, dia, plato);
+        dias[dia][grupo][posicion] = lectura.texto;
+        diagnostico[dia][grupo][posicion] = lectura;
       }
     }
 
-    pintarFormularioDias(dias);
+    pintarFormularioDias(dias, diagnostico);
     $("revision-ocr").hidden = false;
     $("resultado-importacion").hidden = true;
     const vacios = dias.reduce((total, dia) => total + [...dia.primeros, ...dia.segundos].filter(x => !x).length, 0);
+    const dudosos = diagnostico.reduce((total, dia) => total + [...dia.primeros, ...dia.segundos].filter(x => x?.revisar).length, 0);
     $("ocr-progreso").textContent = vacios
-      ? `Lectura terminada. Revisa los platos: quedan ${vacios} campos sin reconocer.`
-      : "Lectura por celdas terminada. Revisa los 30 platos antes de preparar la semana.";
-    $("ocr-progreso").className = vacios ? "editor-message message-info" : "editor-message message-success";
+      ? `Lectura terminada. Quedan ${vacios} campos sin reconocer y ${dudosos} marcados para revisar.`
+      : dudosos
+        ? `Lectura terminada. Revisa los ${dudosos} campos resaltados antes de preparar la semana.`
+        : "Lectura terminada con buena confianza. Revisa los 30 platos antes de preparar la semana.";
+    $("ocr-progreso").className = vacios || dudosos ? "editor-message message-info" : "editor-message message-success";
     $("revision-ocr").scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (error) {
     console.error(error);

@@ -1369,3 +1369,35 @@ input {
 @media (prefers-color-scheme: dark) {
   .cut-card { background: rgba(255,255,255,.06); }
 }
+
+/* V6.1 · Aviso visual de lecturas OCR dudosas */
+.ocr-structured-row.ocr-needs-review {
+  position: relative;
+}
+.ocr-structured-row.ocr-needs-review input {
+  border-color: #ff9f0a;
+  box-shadow: 0 0 0 3px rgba(255,159,10,.16);
+  background: rgba(255,159,10,.07);
+}
+.ocr-structured-row.ocr-needs-review::after {
+  content: "Revisar";
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: #a85d00;
+  background: rgba(255,244,220,.94);
+  border-radius: 999px;
+  padding: 4px 7px;
+}
+@media (prefers-color-scheme: dark) {
+  .ocr-structured-row.ocr-needs-review::after {
+    color: #ffd18a;
+    background: rgba(91,53,0,.92);
+  }
+}

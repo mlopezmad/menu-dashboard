@@ -15,3 +15,11 @@ Funciones:
 - Publicación real en Menu-comedor/menu.json.
 - Protección mediante SHA para no sobrescribir cambios recientes.
 - Mantiene login, logout, PWA e iconos.
+
+V6.1 · OCR reforzado
+- Mantiene intacta la calibración visual y la fila SEGUNDOS.
+- Amplía cada celda y añade margen blanco antes del OCR.
+- Mejora contraste y elimina restos del borde de la tabla.
+- Realiza un segundo intento en escala de grises cuando la lectura es dudosa.
+- Elige el mejor resultado combinando confianza y similitud con el diccionario.
+- Resalta en naranja los campos que requieren revisión.
