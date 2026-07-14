@@ -1846,3 +1846,25 @@ body.guided-review-open .reference-floating-button {
   .reference-compact-preview { height: 150px; border-radius: 17px; }
   .reference-compact-card > p { font-size: 15px; }
 }
+
+
+/* V11.5 · Referencia sincronizada con la celda activa */
+.reference-dialog[open] { display: grid; grid-template-rows: auto 1fr; }
+.reference-dialog-toolbar { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 76px; padding: 14px 78px 14px 22px; background: rgba(18,18,18,.96); color: #fff; border-bottom: 1px solid rgba(255,255,255,.12); }
+.reference-dialog-context { margin: 0 0 3px; color: rgba(255,255,255,.62); font-size: 11px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+.reference-dialog-toolbar strong { font-size: 17px; line-height: 1.2; }
+.reference-dialog-switch { display: flex; gap: 4px; padding: 4px; border-radius: 13px; background: rgba(255,255,255,.10); }
+.reference-mode-button { min-height: 38px; padding: 8px 12px; border-radius: 10px; color: rgba(255,255,255,.68); font-size: 13px; font-weight: 900; cursor: pointer; }
+.reference-mode-button.is-active { background: #fff; color: #111; }
+.reference-mode-button:disabled { opacity: .35; cursor: default; }
+.reference-dialog-stage img { width: auto; min-width: min(92%, 760px); max-width: none; max-height: none; }
+.reference-dialog-stage { padding: 24px; align-items: center; }
+.ocr-structured-row:focus-within { outline: 2px solid rgba(227,6,19,.28); outline-offset: 3px; }
+@media (max-width: 700px) {
+  .reference-dialog-toolbar { min-height: 112px; padding: max(14px, env(safe-area-inset-top)) 66px 12px 16px; align-items: flex-start; flex-direction: column; gap: 10px; }
+  .reference-dialog-switch { width: 100%; }
+  .reference-mode-button { flex: 1; }
+  .reference-dialog-stage { padding: 14px; }
+  .reference-dialog-stage img { min-width: 150vw; }
+  .reference-dialog-stage img[src^="data:image/jpeg"] { }
+}

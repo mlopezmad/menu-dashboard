@@ -15,6 +15,8 @@ let urlPreviewImportacion = null;
 let imagenReferenciaImportacion = null;
 let fechasReferenciaImportacion = new Set();
 let revisionGuiadaActiva = false;
+let referenciaCeldaActiva = null;
+let referenciaModo = "celda";
 let campoRevisionActivo = null;
 let limitesFilasDetectados = null;
 const CALIBRATION_KEY = "menuDashboardCalibrationV6";
@@ -777,6 +779,7 @@ function marcarCampoComoRevisado(input, { aprender = true } = {}) {
 function enfocarCampoRevision(input, { seleccionar = true } = {}) {
   if (!input) return;
   campoRevisionActivo = input;
+  actualizarReferenciaCeldaActiva(input);
   input.scrollIntoView({ behavior: "smooth", block: "center" });
   window.setTimeout(() => {
     input.focus({ preventScroll: true });
@@ -975,6 +978,8 @@ function pintarFormularioDias(dias, diagnostico = null) {
         const fila = document.createElement("label"); fila.className = "ocr-structured-row";
         const numero = document.createElement("span"); numero.textContent = `${i + 1}`;
         const input = document.createElement("input"); input.type = "text"; input.dataset.tipo = tipo;
+        input.dataset.diaIndice = String(indice);
+        input.dataset.platoIndice = String((tipo === "primeros" ? 0 : 3) + i);
         input.value = dia?.[tipo]?.[i] || ""; input.placeholder = `${tipo === "primeros" ? "Primer" : "Segundo"} plato ${i + 1}`;
         const info = diagnostico?.[indice]?.[tipo]?.[i];
         if (info) {
@@ -1011,6 +1016,7 @@ function pintarFormularioDias(dias, diagnostico = null) {
         });
         input.addEventListener("focus", () => {
           campoRevisionActivo = input;
+          actualizarReferenciaCeldaActiva(input);
           mostrarBarraRevisionGuiada();
         });
         input.addEventListener("keydown", event => {
@@ -1205,10 +1211,74 @@ function actualizarReferenciaRevision() {
   if (visible && imagen.src !== imagenReferenciaImportacion) imagen.src = imagenReferenciaImportacion;
 }
 
+function contextoCeldaReferencia(input = campoRevisionActivo) {
+  if (!input?.dataset) return null;
+  const dia = Number(input.dataset.diaIndice);
+  const plato = Number(input.dataset.platoIndice);
+  if (!Number.isInteger(dia) || !Number.isInteger(plato)) return null;
+  const seccion = plato < 3 ? "Primeros" : "Segundos";
+  const posicion = (plato % 3) + 1;
+  return { dia, plato, seccion, posicion, titulo: `${nombreDiaDesdeIndice(dia)} · ${seccion} ${posicion}` };
+}
+
+function crearImagenCeldaReferencia(dia, plato) {
+  if (!fuenteImportacion) return null;
+  const g = geometriaCelda(dia, plato);
+  const margenX = Math.max(8, g.sw * .08);
+  const margenY = Math.max(6, g.sh * .28);
+  const sx = Math.max(0, g.sx - margenX);
+  const sy = Math.max(0, g.sy - margenY);
+  const sw = Math.min(fuenteImportacion.width - sx, g.sw + margenX * 2);
+  const sh = Math.min(fuenteImportacion.height - sy, g.sh + margenY * 2);
+  const escala = Math.min(5, Math.max(2.3, 1150 / Math.max(sw, 1)));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(720, Math.round(sw * escala));
+  canvas.height = Math.max(210, Math.round(sh * escala));
+  const ctx = canvas.getContext("2d", { alpha: false });
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(fuenteImportacion, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+  const rx = ((g.sx - sx) / sw) * canvas.width;
+  const ry = ((g.sy - sy) / sh) * canvas.height;
+  const rw = (g.sw / sw) * canvas.width;
+  const rh = (g.sh / sh) * canvas.height;
+  ctx.strokeStyle = "#e30613";
+  ctx.lineWidth = Math.max(7, canvas.width / 150);
+  ctx.setLineDash([18, 12]);
+  ctx.strokeRect(rx, ry, rw, rh);
+  ctx.setLineDash([]);
+  return canvas.toDataURL("image/jpeg", .94);
+}
+
+function actualizarReferenciaCeldaActiva(input = campoRevisionActivo) {
+  referenciaCeldaActiva = contextoCeldaReferencia(input);
+  const texto = $("referencia-flotante")?.querySelector("span:last-child");
+  if (texto) texto.textContent = referenciaCeldaActiva ? "Ver celda" : "Ver menú";
+}
+
+function mostrarModoReferencia(modo = referenciaModo) {
+  if (!imagenReferenciaImportacion) return;
+  referenciaModo = modo;
+  const contexto = referenciaCeldaActiva || contextoCeldaReferencia();
+  const usarCelda = modo === "celda" && contexto && fuenteImportacion;
+  const src = usarCelda ? crearImagenCeldaReferencia(contexto.dia, contexto.plato) : imagenReferenciaImportacion;
+  $("reference-dialog-img").src = src || imagenReferenciaImportacion;
+  $("reference-dialog-context").textContent = usarCelda ? "Celda detectada" : "Menú original";
+  $("reference-dialog-title").textContent = usarCelda ? contexto.titulo : "Foto completa";
+  $("reference-show-cell").classList.toggle("is-active", Boolean(usarCelda));
+  $("reference-show-full").classList.toggle("is-active", !usarCelda);
+  $("reference-show-cell").disabled = !contexto || !fuenteImportacion;
+  const stage = $("reference-dialog").querySelector(".reference-dialog-stage");
+  stage.scrollTop = 0; stage.scrollLeft = 0;
+}
+
 function abrirReferencia() {
   if (!imagenReferenciaImportacion) return;
   const dialogo = $("reference-dialog");
-  $("reference-dialog-img").src = imagenReferenciaImportacion;
+  referenciaCeldaActiva = contextoCeldaReferencia() || referenciaCeldaActiva;
+  mostrarModoReferencia(referenciaCeldaActiva ? "celda" : "completo");
   dialogo.showModal();
 }
 
@@ -1661,6 +1731,8 @@ function prepararEventos() {
   $("publicar-menu").addEventListener("click", publicarMenu);
   $("referencia-flotante").addEventListener("click", abrirReferencia);
   $("cerrar-referencia").addEventListener("click", cerrarReferencia);
+  $("reference-show-cell")?.addEventListener("click", () => mostrarModoReferencia("celda"));
+  $("reference-show-full")?.addEventListener("click", () => mostrarModoReferencia("completo"));
   $("reference-dialog").addEventListener("click", event => { if (event.target === $("reference-dialog")) cerrarReferencia(); });
   $("ampliar-referencia-compacta")?.addEventListener("click", abrirReferencia);
   $("abrir-referencia-compacta")?.addEventListener("click", abrirReferencia);

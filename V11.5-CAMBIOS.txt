@@ -1,0 +1,9 @@
+MENÚ DASHBOARD · V11.5
+
+- La revisión guiada vincula cada campo con su celda real del menú.
+- Al pulsar “Ver celda”, el visor abre directamente un recorte ampliado del plato activo.
+- La celda se resalta con un marco rojo discontinuo.
+- El visor indica día, sección y posición del plato.
+- Selector Celda / Menú completo dentro del mismo visor.
+- La referencia se actualiza automáticamente al avanzar al siguiente plato pendiente.
+- No se modifica OCR, calibración, publicación ni menu.json.
