@@ -1,0 +1,8 @@
+V11.4 · Visor flotante de referencia
+
+- Retira la foto integrada dentro del flujo para que no tape los días ni los platos.
+- Añade un botón flotante «Ver menú» durante la revisión OCR, la vista semanal y la edición diaria.
+- El botón abre el menú original a pantalla completa con zoom y desplazamiento.
+- Se recoloca automáticamente por encima de la barra de revisión guiada.
+- Mantiene las mejoras de confianza OCR de V11.3.
+- No modifica calibración, publicación ni menu.json.

@@ -128,6 +128,7 @@ function mostrarVistaEditor(modo) {
   } else {
     mostrarMenuDeFecha($("selector-fecha").value);
   }
+  actualizarBotonReferenciaFlotante();
 }
 
 function renderizarVistaSemanal() {
@@ -146,9 +147,7 @@ function renderizarVistaSemanal() {
   $("semana-detalle").textContent = `${semana.fechas.length} ${semana.fechas.length === 1 ? "fecha disponible" : "fechas disponibles"}. Revisa toda la semana y abre un día solo cuando necesites editarlo.`;
   $("semana-estado").textContent = estado.texto;
   $("semana-estado").className = `read-only-badge week-status ${estado.clase}`;
-  const referenciaDisponible = Boolean(imagenReferenciaImportacion && semana.fechas.some(fecha => fechasReferenciaImportacion.has(fecha)));
-  $("semana-referencia").hidden = !referenciaDisponible;
-  if (referenciaDisponible) $("semana-referencia-img").src = imagenReferenciaImportacion;
+  actualizarBotonReferenciaFlotante();
 
   semana.fechas.forEach(clave => {
     const menu = normalizarMenuDia(menuTrabajo.dias[clave]);
@@ -441,6 +440,7 @@ function cambiarVista(idVista) {
     const vista = $(id);
     if (vista) vista.hidden = id !== idVista;
   });
+  actualizarBotonReferenciaFlotante();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -1171,22 +1171,32 @@ function prepararImagenReferencia() {
   } catch { imagenReferenciaImportacion = null; }
 }
 
+function referenciaDisponibleEnContexto() {
+  if (!imagenReferenciaImportacion) return false;
+  const revisionVisible = $("revision-ocr") && !$("revision-ocr").hidden;
+  const editorVisible = $("vista-editor") && !$("vista-editor").hidden;
+  if (revisionVisible) return true;
+  if (!editorVisible) return false;
+  if (modoEditor === "semana") {
+    const semana = obtenerSemanaDeFecha($("selector-fecha").value || fechasSemanaActiva[0] || "");
+    return semana.fechas.some(fecha => fechasReferenciaImportacion.has(fecha));
+  }
+  return Boolean(fechaActiva && fechasReferenciaImportacion.has(fechaActiva));
+}
+
+function actualizarBotonReferenciaFlotante() {
+  const boton = $("referencia-flotante");
+  if (!boton) return;
+  boton.hidden = !referenciaDisponibleEnContexto();
+  document.body.classList.toggle("reference-floating-open", !boton.hidden);
+}
+
 function actualizarReferenciaEditor() {
-  const panel = $("editor-referencia");
-  const disponible = Boolean(imagenReferenciaImportacion && fechasReferenciaImportacion.has(fechaActiva));
-  panel.hidden = !disponible;
-  if (!disponible) return;
-  $("editor-referencia-img").src = imagenReferenciaImportacion;
-  $("reference-dialog-img").src = imagenReferenciaImportacion;
+  actualizarBotonReferenciaFlotante();
 }
 
 function actualizarReferenciaRevision() {
-  const panel = $("revision-referencia");
-  if (!panel) return;
-  panel.hidden = !imagenReferenciaImportacion;
-  if (!imagenReferenciaImportacion) return;
-  $("revision-referencia-img").src = imagenReferenciaImportacion;
-  $("reference-dialog-img").src = imagenReferenciaImportacion;
+  actualizarBotonReferenciaFlotante();
 }
 
 function abrirReferencia() {
@@ -1643,9 +1653,7 @@ function prepararEventos() {
   $("descartar-cambios").addEventListener("click", descartarCambios);
   $("eliminar-fecha").addEventListener("click", eliminarFecha);
   $("publicar-menu").addEventListener("click", publicarMenu);
-  $("ampliar-referencia").addEventListener("click", abrirReferencia);
-  $("ampliar-referencia-semana").addEventListener("click", abrirReferencia);
-  $("ampliar-referencia-revision").addEventListener("click", abrirReferencia);
+  $("referencia-flotante").addEventListener("click", abrirReferencia);
   $("cerrar-referencia").addEventListener("click", cerrarReferencia);
   $("reference-dialog").addEventListener("click", event => { if (event.target === $("reference-dialog")) cerrarReferencia(); });
   window.addEventListener("beforeunload", event => { if (hayCambios) { event.preventDefault(); event.returnValue = ""; } });

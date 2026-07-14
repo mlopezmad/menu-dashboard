@@ -1725,3 +1725,65 @@ body.guided-review-open { padding-bottom: 96px; }
   .review-reference-card .reference-heading h3 { font-size: 16px; }
   .review-reference-viewport { height: 170px; }
 }
+
+/* V11.4 · Visor flotante de referencia */
+.reference-floating-button {
+  position: fixed;
+  z-index: 18;
+  right: max(18px, env(safe-area-inset-right));
+  bottom: max(22px, calc(env(safe-area-inset-bottom) + 18px));
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 52px;
+  padding: 0 18px;
+  border: 1px solid rgba(227,6,19,.18);
+  border-radius: 999px;
+  background: rgba(255,255,255,.94);
+  color: var(--red);
+  box-shadow: 0 14px 38px rgba(17,17,17,.20), 0 8px 24px rgba(227,6,19,.14);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  font-size: 15px;
+  font-weight: 900;
+  cursor: pointer;
+}
+.reference-floating-button[hidden] { display: none; }
+.reference-floating-icon {
+  display: grid;
+  place-items: center;
+  width: 29px;
+  height: 29px;
+  border-radius: 10px;
+  background: rgba(227,6,19,.10);
+  font-size: 18px;
+  line-height: 1;
+}
+body.guided-review-open .reference-floating-button {
+  bottom: max(112px, calc(env(safe-area-inset-bottom) + 106px));
+}
+.reference-dialog-stage {
+  touch-action: pan-x pan-y pinch-zoom;
+  overscroll-behavior: contain;
+}
+.reference-dialog-stage img {
+  user-select: none;
+  -webkit-user-drag: none;
+}
+@media (max-width: 620px) {
+  .reference-floating-button {
+    right: 14px;
+    bottom: max(16px, calc(env(safe-area-inset-bottom) + 12px));
+    min-height: 48px;
+    padding: 0 15px;
+  }
+  body.guided-review-open .reference-floating-button {
+    bottom: max(164px, calc(env(safe-area-inset-bottom) + 156px));
+  }
+}
+@media (prefers-color-scheme: dark) {
+  .reference-floating-button {
+    background: rgba(28,28,30,.94);
+    border-color: rgba(255,255,255,.10);
+  }
+}

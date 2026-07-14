@@ -155,19 +155,7 @@
         <p class="status-label">Menú reconstruido</p>
         <h2>Revisa los platos antes de preparar la semana</h2>
         <p class="import-help">La app detecta las líneas horizontales de la tabla y lee cada plato dentro de su celda real. Revisa 3 primeros y 3 segundos por día; la dieta estándar se añade automáticamente.</p>
-        <section id="revision-referencia" class="reference-card review-reference-card" hidden>
-          <div class="reference-heading">
-            <div>
-              <p class="status-label">Menú original</p>
-              <h3>Comprueba la foto mientras corriges</h3>
-            </div>
-            <button id="ampliar-referencia-revision" class="secondary-action" type="button">Ampliar</button>
-          </div>
-          <div class="reference-viewport review-reference-viewport">
-            <img id="revision-referencia-img" alt="Foto original del menú durante la revisión">
-          </div>
-          <p class="file-help">La imagen permanece disponible durante la revisión y en el editor de la semana.</p>
-        </section>
+        
         <div id="ocr-dias" class="ocr-days"></div>
         <div class="editor-actions">
           <button id="plantilla-semana" class="secondary-action" type="button">Crear plantilla</button>
@@ -196,7 +184,7 @@
     <section id="vista-editor" class="editor-view" hidden>
       <header class="editor-header">
         <button id="volver-inicio" class="back-button" type="button">← Volver</button>
-        <p class="eyebrow">Editor · V11.3</p>
+        <p class="eyebrow">Editor · V11.4</p>
         <h1>Editar menú</h1>
         <p class="intro">Selecciona una fecha, modifica los platos y publica cuando esté revisado.</p>
       </header>
@@ -232,18 +220,7 @@
             <span id="semana-estado" class="read-only-badge">Publicada</span>
           </div>
 
-          <section id="semana-referencia" class="reference-card" hidden>
-            <div class="reference-heading">
-              <div>
-                <p class="status-label">Menú original</p>
-                <h3>Referencia de la semana importada</h3>
-              </div>
-              <button id="ampliar-referencia-semana" class="secondary-action" type="button">Ampliar</button>
-            </div>
-            <div class="reference-viewport">
-              <img id="semana-referencia-img" alt="Foto original del menú importado">
-            </div>
-          </section>
+          
 
           <div id="semana-dias" class="weekly-days-grid"></div>
         </article>
@@ -260,19 +237,7 @@
           </div>
 
 
-          <section id="editor-referencia" class="reference-card" hidden>
-            <div class="reference-heading">
-              <div>
-                <p class="status-label">Menú original</p>
-                <h3>Comprueba el día sin salir del editor</h3>
-              </div>
-              <button id="ampliar-referencia" class="secondary-action" type="button">Ampliar</button>
-            </div>
-            <div class="reference-viewport">
-              <img id="editor-referencia-img" alt="Foto original del menú importado">
-            </div>
-            <p class="file-help">La imagen se conserva durante este borrador. Puedes ampliar y mover para comparar los platos.</p>
-          </section>
+          
 
           <label class="festivo-toggle">
             <input id="editor-festivo" type="checkbox">
@@ -317,6 +282,11 @@
       </section>
     </section>
   </main>
+
+  <button id="referencia-flotante" class="reference-floating-button" type="button" hidden aria-label="Abrir foto original del menú">
+    <span class="reference-floating-icon" aria-hidden="true">▣</span>
+    <span>Ver menú</span>
+  </button>
   <dialog id="reference-dialog" class="reference-dialog">
     <button id="cerrar-referencia" class="reference-close" type="button" aria-label="Cerrar imagen">×</button>
     <div class="reference-dialog-stage">
