@@ -326,13 +326,29 @@ function crearPlantillaSemana() {
     $("ocr-progreso").className = "editor-message message-error";
     return;
   }
-  pintarTextosDias(Array.from({ length: 5 }, (_, i) => `PRIMEROS:\n- \nSEGUNDOS:\n- \nDIETA:\n- `));
+  pintarTextosDias(Array.from({ length: 5 }, (_, i) => `PRIMEROS:\n- \nSEGUNDOS:\n- `));
   $("revision-ocr").hidden = false;
   $("resultado-importacion").hidden = true;
 }
 
 function limpiarLineaOcr(linea) {
-  return linea.replace(/^[•·▪◦*-]+\s*/, "").replace(/\s+/g, " ").trim();
+  return linea
+    .replace(/^[•·▪◦*_=|\-–—.]+\s*/, "")
+    .replace(/[|_=]{2,}/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function esRuidoOcr(linea) {
+  const texto = limpiarLineaOcr(linea);
+  if (!texto) return true;
+  if (texto.length <= 2) return true;
+  if (!/[A-ZÁÉÍÓÚÜÑ]/i.test(texto)) return true;
+  const letras = (texto.match(/[A-ZÁÉÍÓÚÜÑ]/gi) || []).length;
+  const raros = (texto.match(/[^A-ZÁÉÍÓÚÜÑ0-9 ,.'()\-/]/gi) || []).length;
+  if (raros > letras) return true;
+  if (/^(MAHOU|SANMIGUEL|SEMANA|MENU|MENÚ)$/i.test(texto)) return true;
+  return false;
 }
 
 function normalizarEncabezado(texto) {
@@ -343,30 +359,34 @@ function detectarSeccion(linea) {
   const normal = normalizarEncabezado(linea);
   if (/PRIMER(OS|O)|ENTRANTE/.test(normal)) return "primeros";
   if (/SEGUND(OS|O)|PRINCIPAL/.test(normal)) return "segundos";
-  if (/DIETA|PLANCHA|SALUDABLE/.test(normal)) return "dieta";
+  if (/DIETA Y PLANCHA|DIETA|SALUDABLE/.test(normal)) return "fin";
   return null;
 }
 
 function parsearTextoDia(texto) {
-  const dia = { primeros: [], segundos: [], dieta: [] };
-  const lineas = texto.split(/\r?\n/).map(limpiarLineaOcr).filter(Boolean);
+  const dia = {
+    primeros: [],
+    segundos: [],
+    dieta: ["Primero de dieta", "Carne plancha", "Pescado plancha"]
+  };
+  const lineas = texto.split(/\r?\n/).map(limpiarLineaOcr).filter(linea => !esRuidoOcr(linea));
   let seccion = null;
   for (const linea of lineas) {
     const detectada = detectarSeccion(linea);
+    if (detectada === "fin") break;
     if (detectada) {
       seccion = detectada;
-      const resto = linea.replace(/^.*?:/, "").trim();
-      if (resto && resto !== linea) dia[seccion].push(resto);
       continue;
     }
     const normal = normalizarEncabezado(linea);
     if (/^(LUNES|MARTES|MIERCOLES|JUEVES|VIERNES)\b/.test(normal)) continue;
-    if (seccion) dia[seccion].push(linea);
+    if (seccion === "primeros" || seccion === "segundos") dia[seccion].push(linea);
   }
-  for (const tipo of ["primeros", "segundos", "dieta"]) {
+  for (const tipo of ["primeros", "segundos"]) {
     dia[tipo] = dia[tipo]
       .map(limpiarLineaOcr)
-      .filter(x => x && !/^(MENU|SEMANA|MAHOU|SANMIGUEL)/i.test(x));
+      .filter(x => x && !esRuidoOcr(x))
+      .slice(0, 3);
   }
   return dia;
 }
@@ -386,7 +406,7 @@ function pintarTextosDias(textos) {
     const area = document.createElement("textarea");
     area.className = "ocr-text ocr-day-text";
     area.spellcheck = true;
-    area.value = texto || "PRIMEROS:\n\nSEGUNDOS:\n\nDIETA:\n";
+    area.value = texto || "PRIMEROS:\n\nSEGUNDOS:\n";
     bloque.append(titulo, area);
     contenedor.appendChild(bloque);
   });
@@ -403,8 +423,8 @@ function prepararSemanaDesdeTexto() {
   textos.forEach((texto, i) => {
     const dia = parsearTextoDia(texto);
     dias[fechas[i]] = dia;
-    for (const tipo of ["primeros", "segundos", "dieta"]) {
-      if (!dia[tipo].length) errores.push(`${nombreDiaDesdeIndice(i)}: falta ${tipo}.`);
+    for (const tipo of ["primeros", "segundos"]) {
+      if (dia[tipo].length !== 3) errores.push(`${nombreDiaDesdeIndice(i)}: deben quedar 3 ${tipo}.`);
     }
   });
   if (errores.length) {
