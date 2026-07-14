@@ -1,0 +1,11 @@
+MENÚ DASHBOARD V7 · ASISTENTE LOCAL
+
+- Mantiene intacta la calibración visual y los 30 recortes.
+- Añade interpretación local del texto OCR sin servicios externos ni coste.
+- Compara cada lectura con platos habituales y con el menú ya publicado.
+- Corrige automáticamente solo coincidencias de alta fiabilidad.
+- Clasifica cada plato con confianza Alta, Revisar o Baja.
+- Muestra sugerencias en el título del campo cuando existen.
+- Aprende localmente de las correcciones manuales realizadas por el usuario.
+- El aprendizaje se guarda únicamente en el navegador mediante localStorage.
+- No utiliza OpenAI, tokens ni APIs de pago.

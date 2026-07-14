@@ -1401,3 +1401,24 @@ input {
     background: rgba(91,53,0,.92);
   }
 }
+
+/* V7 · interpretación local y confianza OCR */
+.ocr-structured-row { position: relative; }
+.ocr-confidence-badge {
+  flex: 0 0 auto;
+  min-width: 48px;
+  padding: 4px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  text-align: center;
+  letter-spacing: .02em;
+}
+.ocr-confidence-alta .ocr-confidence-badge { background: #e8f7ed; color: #18753a; }
+.ocr-confidence-media .ocr-confidence-badge { background: #fff4d6; color: #8a5a00; }
+.ocr-confidence-baja .ocr-confidence-badge { background: #ffe6e6; color: #a81d1d; }
+.ocr-confidence-media input { border-color: #d99a20 !important; background: #fffaf0; }
+.ocr-confidence-baja input { border-color: #d94a4a !important; background: #fff5f5; }
+@media (max-width: 640px) {
+  .ocr-confidence-badge { min-width: 42px; padding-inline: 5px; }
+}

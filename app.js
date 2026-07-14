@@ -391,6 +391,86 @@ function distanciaLevenshtein(a, b) {
   return fila[y.length];
 }
 
+
+const OCR_APRENDIZAJE_KEY = "menu-dashboard-ocr-aprendizaje-v1";
+
+function cargarAprendizajeOcr() {
+  try {
+    const datos = JSON.parse(localStorage.getItem(OCR_APRENDIZAJE_KEY) || "{}");
+    return datos && typeof datos === "object" ? datos : {};
+  } catch {
+    return {};
+  }
+}
+
+function guardarAprendizajeOcr(datos) {
+  try { localStorage.setItem(OCR_APRENDIZAJE_KEY, JSON.stringify(datos)); } catch {}
+}
+
+function aprenderCorreccionOcr(original, corregido) {
+  const clave = normalizarOcr(original).replace(/\s+/g, " ").trim();
+  const valor = String(corregido || "").trim();
+  if (clave.length < 3 || valor.length < 4 || clave === normalizarOcr(valor)) return;
+  const datos = cargarAprendizajeOcr();
+  datos[clave] = valor;
+  guardarAprendizajeOcr(datos);
+}
+
+function platosPorTipo(tipo) {
+  const base = diccionarioPlatos();
+  const delMenu = [];
+  for (const dia of Object.values(menuPublicado?.dias || {})) {
+    for (const plato of dia?.[tipo] || []) delMenu.push(plato);
+  }
+  const aprendidos = Object.values(cargarAprendizajeOcr());
+  return [...new Set([...delMenu, ...aprendidos, ...base].map(x => String(x).trim()).filter(Boolean))];
+}
+
+function similitudTokens(a, b) {
+  const ta = new Set(normalizarOcr(a).split(/\s+/).filter(x => x.length > 1));
+  const tb = new Set(normalizarOcr(b).split(/\s+/).filter(x => x.length > 1));
+  if (!ta.size || !tb.size) return 0;
+  let comun = 0;
+  for (const x of ta) if (tb.has(x)) comun += 1;
+  return comun / Math.max(ta.size, tb.size);
+}
+
+function interpretarTextoOcr(texto, confianza = 0, tipo = "primeros") {
+  const limpio = limpiarLineaOcr(texto);
+  const normal = normalizarOcr(limpio).replace(/\s+/g, " ").trim();
+  const aprendido = cargarAprendizajeOcr()[normal];
+  if (aprendido) {
+    return { texto: aprendido, original: limpio, sugerencia: aprendido, nivel: "alta", puntuacion: 100, aprendido: true };
+  }
+  if (!limpio) return { texto: "", original: "", sugerencia: "", nivel: "baja", puntuacion: 0 };
+
+  let mejor = "", mejorPuntuacion = 0, mejorRatio = 1;
+  for (const plato of platosPorTipo(tipo)) {
+    const np = normalizarOcr(plato);
+    const ratio = distanciaLevenshtein(normal, np) / Math.max(normal.length, np.length, 1);
+    const lev = 1 - ratio;
+    const tokens = similitudTokens(limpio, plato);
+    const contiene = normal.length >= 5 && (np.includes(normal) || normal.includes(np)) ? 0.18 : 0;
+    const puntuacion = Math.min(1, lev * 0.72 + tokens * 0.28 + contiene);
+    if (puntuacion > mejorPuntuacion) {
+      mejorPuntuacion = puntuacion;
+      mejorRatio = ratio;
+      mejor = plato;
+    }
+  }
+
+  const letras = (normal.match(/[A-Z]/g) || []).length;
+  const demasiadoCorto = letras < 5 || normal.split(/\s+/).filter(Boolean).length < 2;
+  const autoCorregir = !demasiadoCorto && (mejorPuntuacion >= 0.79 || mejorRatio <= 0.28);
+  const sugerir = !demasiadoCorto && (mejorPuntuacion >= 0.62 || mejorRatio <= 0.42);
+  const textoFinal = autoCorregir ? mejor : limpio
+    .toLocaleLowerCase("es-ES")
+    .replace(/(^|\s)([a-záéíóúüñ])/g, (_, a, b) => a + b.toLocaleUpperCase("es-ES"));
+  const puntuacion = Math.round(Math.max(0, Math.min(100, confianza * 0.48 + mejorPuntuacion * 52)));
+  const nivel = !textoFinal || demasiadoCorto || puntuacion < 48 ? "baja" : puntuacion < 76 || (sugerir && !autoCorregir) ? "media" : "alta";
+  return { texto: textoFinal, original: limpio, sugerencia: sugerir ? mejor : "", nivel, puntuacion, aprendido: false };
+}
+
 function diccionarioPlatos() {
   const base = [
     "Lentejas castellanas", "Menestra de verduras", "Ensalada de temporada", "Libritos de lomo con jamón y queso",
@@ -516,12 +596,26 @@ function pintarFormularioDias(dias, diagnostico = null) {
         const input = document.createElement("input"); input.type = "text"; input.dataset.tipo = tipo;
         input.value = dia?.[tipo]?.[i] || ""; input.placeholder = `${tipo === "primeros" ? "Primer" : "Segundo"} plato ${i + 1}`;
         const info = diagnostico?.[indice]?.[tipo]?.[i];
-        if (info?.revisar) {
-          fila.classList.add("ocr-needs-review");
-          input.setAttribute("aria-label", `${input.placeholder}. Revisar lectura OCR`);
-          input.title = `Revisar lectura OCR · confianza ${Math.round(info.confianza || 0)}%`;
+        if (info) {
+          const nivel = info.nivel || (info.revisar ? "media" : "alta");
+          fila.classList.add(`ocr-confidence-${nivel}`);
+          if (nivel !== "alta") fila.classList.add("ocr-needs-review");
+          input.dataset.ocrOriginal = info.original || info.textoOriginal || "";
+          input.dataset.ocrSugerencia = info.sugerencia || "";
+          const detalle = info.sugerencia && info.sugerencia !== input.value ? ` · Sugerencia: ${info.sugerencia}` : "";
+          input.title = `Confianza ${info.puntuacion ?? Math.round(info.confianza || 0)}%${detalle}`;
+          input.setAttribute("aria-label", `${input.placeholder}. Confianza ${nivel}${detalle}`);
+          const badge = document.createElement("small");
+          badge.className = "ocr-confidence-badge";
+          badge.textContent = nivel === "alta" ? "Alta" : nivel === "media" ? "Revisar" : "Baja";
+          fila.appendChild(badge);
         }
-        input.addEventListener("input", () => fila.classList.remove("ocr-needs-review"));
+        input.addEventListener("input", () => {
+          fila.classList.remove("ocr-needs-review", "ocr-confidence-media", "ocr-confidence-baja");
+          fila.classList.add("ocr-confidence-alta");
+          fila.querySelector(".ocr-confidence-badge")?.remove();
+        });
+        input.addEventListener("change", () => aprenderCorreccionOcr(input.dataset.ocrOriginal || "", input.value));
         fila.append(numero, input); lista.appendChild(fila);
       }
       bloque.appendChild(lista);
@@ -548,6 +642,9 @@ function prepararSemanaDesdeTexto() {
     $("ocr-progreso").className = "editor-message message-error";
     return;
   }
+  document.querySelectorAll(".ocr-structured-row input").forEach(input => {
+    aprenderCorreccionOcr(input.dataset.ocrOriginal || "", input.value);
+  });
   borradorImportacion = { dias };
   comparacionImportacion = compararBorrador(borradorImportacion);
   pintarComparacion(comparacionImportacion);
@@ -835,7 +932,7 @@ function puntuacionCandidatoOcr(texto, confianza = 0) {
   return confianza * 0.55 + (1 - mejorRatio) * 42 + palabras * 1.5 + longitudUtil * 5;
 }
 
-async function reconocerCelda(worker, dia, plato) {
+async function reconocerCelda(worker, dia, plato, tipo) {
   const intento1 = await worker.recognize(crearCanvasCelda(dia, plato, "binario"));
   const candidato1 = {
     texto: limpiarTextoCelda(intento1?.data?.text || ""),
@@ -856,10 +953,17 @@ async function reconocerCelda(worker, dia, plato) {
 
   candidatos.sort((a, b) => puntuacionCandidatoOcr(b.texto, b.confianza) - puntuacionCandidatoOcr(a.texto, a.confianza));
   const mejor = candidatos[0] || { texto: "", confianza: 0, modo: "binario" };
+  const interpretado = interpretarTextoOcr(mejor.texto, mejor.confianza, tipo);
   return {
-    texto: mejor.texto,
+    texto: interpretado.texto,
+    textoOriginal: mejor.texto,
+    original: interpretado.original,
+    sugerencia: interpretado.sugerencia,
     confianza: mejor.confianza,
-    revisar: textoSospechosoOcr(mejor.texto, mejor.confianza),
+    puntuacion: interpretado.puntuacion,
+    nivel: interpretado.nivel,
+    revisar: interpretado.nivel !== "alta",
+    aprendido: interpretado.aprendido,
     modo: mejor.modo
   };
 }
@@ -945,7 +1049,7 @@ async function leerFotoConOcr() {
         const grupo = plato < 3 ? "primeros" : "segundos";
         const posicion = plato % 3;
         $("ocr-progreso").textContent = `${nombreDiaDesdeIndice(dia)} · ${grupo === "primeros" ? "primer" : "segundo"} ${posicion + 1}`;
-        const lectura = await reconocerCelda(worker, dia, plato);
+        const lectura = await reconocerCelda(worker, dia, plato, grupo);
         dias[dia][grupo][posicion] = lectura.texto;
         diagnostico[dia][grupo][posicion] = lectura;
       }
