@@ -578,6 +578,60 @@ function leerFormularioDias() {
   }));
 }
 
+function actualizarEstadoRevision({ animarFila = null } = {}) {
+  const filas = Array.from(document.querySelectorAll(".ocr-structured-row"));
+  if (!filas.length) return;
+
+  let pendientes = 0;
+  filas.forEach(fila => {
+    const input = fila.querySelector("input");
+    const vacio = !input?.value.trim();
+    if (vacio) {
+      fila.classList.add("ocr-needs-review", "ocr-confidence-baja");
+      fila.classList.remove("ocr-confidence-alta", "ocr-confidence-media");
+      let badge = fila.querySelector(".ocr-confidence-badge");
+      if (!badge) {
+        badge = document.createElement("small");
+        badge.className = "ocr-confidence-badge";
+        badge.textContent = "Revisar";
+        fila.appendChild(badge);
+      }
+    }
+    if (fila.classList.contains("ocr-needs-review")) pendientes += 1;
+  });
+
+  const total = filas.length;
+  const correctos = Math.max(0, total - pendientes);
+  const porcentaje = total ? Math.round((correctos / total) * 100) : 0;
+  const resumen = $("ocr-resumen");
+  if (resumen) {
+    resumen.classList.toggle("is-ready", pendientes === 0);
+    resumen.innerHTML = `
+      <div class="ocr-summary-copy">
+        <strong>${pendientes === 0 ? "Menú listo para preparar" : `${total} platos detectados`}</strong>
+        <span>${correctos} correctos</span>
+        <span class="summary-review">${pendientes} para revisar</span>
+      </div>
+      <div class="ocr-progress" aria-label="Revisión completada al ${porcentaje}%">
+        <span style="width:${porcentaje}%"></span>
+      </div>
+    `;
+  }
+
+  const boton = $("preparar-semana");
+  if (boton) {
+    boton.classList.toggle("is-ready", pendientes === 0);
+    boton.textContent = pendientes === 0 ? "✓ Menú listo · Preparar semana" : `Preparar semana · ${pendientes} pendientes`;
+  }
+
+  if (animarFila) {
+    animarFila.classList.remove("ocr-row-resolved");
+    void animarFila.offsetWidth;
+    animarFila.classList.add("ocr-row-resolved");
+    window.setTimeout(() => animarFila.classList.remove("ocr-row-resolved"), 450);
+  }
+}
+
 function pintarFormularioDias(dias, diagnostico = null) {
   const contenedor = $("ocr-dias");
   contenedor.innerHTML = "";
@@ -606,9 +660,12 @@ function pintarFormularioDias(dias, diagnostico = null) {
   }
   const total = niveles.alta + niveles.media + niveles.baja;
   resumen.innerHTML = `
-    <strong>${total} platos detectados</strong>
-    <span>${niveles.alta} correctos</span>
-    <span class="summary-review">${niveles.media + niveles.baja} para revisar</span>
+    <div class="ocr-summary-copy">
+      <strong>${total} platos detectados</strong>
+      <span>${niveles.alta} correctos</span>
+      <span class="summary-review">${niveles.media + niveles.baja} para revisar</span>
+    </div>
+    <div class="ocr-progress" aria-label="Progreso de revisión"><span></span></div>
   `;
 
   dias.forEach((dia, indice) => {
@@ -644,9 +701,15 @@ function pintarFormularioDias(dias, diagnostico = null) {
           }
         }
         input.addEventListener("input", () => {
-          fila.classList.remove("ocr-needs-review", "ocr-confidence-media", "ocr-confidence-baja");
-          fila.classList.add("ocr-confidence-alta");
-          fila.querySelector(".ocr-confidence-badge")?.remove();
+          if (input.value.trim()) {
+            const estabaPendiente = fila.classList.contains("ocr-needs-review");
+            fila.classList.remove("ocr-needs-review", "ocr-confidence-media", "ocr-confidence-baja");
+            fila.classList.add("ocr-confidence-alta");
+            fila.querySelector(".ocr-confidence-badge")?.remove();
+            actualizarEstadoRevision({ animarFila: estabaPendiente ? fila : null });
+          } else {
+            actualizarEstadoRevision();
+          }
         });
         input.addEventListener("change", () => aprenderCorreccionOcr(input.dataset.ocrOriginal || "", input.value));
         fila.append(numero, input);
@@ -657,6 +720,7 @@ function pintarFormularioDias(dias, diagnostico = null) {
     }
     contenedor.appendChild(bloque);
   });
+  actualizarEstadoRevision();
 }
 
 

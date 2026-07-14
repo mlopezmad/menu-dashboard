@@ -1,0 +1,9 @@
+MENÚ DASHBOARD · V10
+
+- Contador de platos correctos y pendientes actualizado en tiempo real.
+- Barra de progreso de revisión.
+- Los avisos Revisar desaparecen al corregir un campo.
+- Confirmación visual cuando los 30 platos están listos.
+- El botón principal cambia de estado al completar la revisión.
+- Animación discreta al resolver un plato dudoso.
+- OCR, calibración, recortes y publicación sin cambios.
