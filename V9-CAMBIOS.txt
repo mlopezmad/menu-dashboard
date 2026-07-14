@@ -1,0 +1,8 @@
+MENÚ DASHBOARD · V9 · REVISIÓN INTELIGENTE
+
+- Encabezados actualizados a V9.
+- El aviso Revisar queda integrado dentro del campo.
+- Amarillo para confianza media y rojo para confianza baja.
+- Al pulsar Preparar semana, si quedan campos pendientes, aparece un asistente.
+- Revisar ahora lleva directamente al primer plato dudoso.
+- No modifica OCR, calibración, recortes, editor ni publicación.

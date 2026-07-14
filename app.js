@@ -659,7 +659,48 @@ function pintarFormularioDias(dias, diagnostico = null) {
   });
 }
 
+
+function camposPendientesRevision() {
+  return Array.from(document.querySelectorAll(".ocr-structured-row.ocr-needs-review input"));
+}
+
+function abrirAsistenteRevision() {
+  const pendientes = camposPendientesRevision();
+  if (!pendientes.length) return false;
+
+  let dialogo = document.getElementById("review-assistant-dialog");
+  if (!dialogo) {
+    dialogo = document.createElement("dialog");
+    dialogo.id = "review-assistant-dialog";
+    dialogo.className = "review-assistant-dialog";
+    dialogo.innerHTML = `
+      <form method="dialog" class="review-assistant-card">
+        <p class="eyebrow">Revisión pendiente</p>
+        <h2>Hay platos que conviene revisar</h2>
+        <p id="review-assistant-copy"></p>
+        <div class="review-assistant-actions">
+          <button value="cancel" class="secondary-action" type="submit">Seguir después</button>
+          <button id="review-assistant-start" value="default" class="primary-action" type="button">Revisar ahora</button>
+        </div>
+      </form>`;
+    document.body.appendChild(dialogo);
+  }
+
+  const copy = dialogo.querySelector("#review-assistant-copy");
+  copy.textContent = `Se han detectado ${pendientes.length} platos para revisar antes de preparar la semana.`;
+  const boton = dialogo.querySelector("#review-assistant-start");
+  boton.onclick = () => {
+    dialogo.close();
+    const primero = camposPendientesRevision()[0];
+    primero?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setTimeout(() => primero?.focus(), 350);
+  };
+  dialogo.showModal();
+  return true;
+}
+
 function prepararSemanaDesdeTexto() {
+  if (abrirAsistenteRevision()) return;
   const lunes = $("lunes-semana").value;
   if (!lunes) return window.alert("Selecciona el lunes de la semana.");
   const fechas = fechasSemana(lunes);
