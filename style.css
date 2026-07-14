@@ -1921,6 +1921,37 @@ body.guided-review-open .reference-floating-button {
   font-size: 17px;
   font-weight: 700;
 }
+
+.reference-suggestions { margin-top: 10px; }
+.reference-suggestions[hidden] { display: none; }
+.reference-suggestions-label {
+  margin: 0 0 7px;
+  color: rgba(255,255,255,.58);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .10em;
+  text-transform: uppercase;
+}
+.reference-suggestions-list { display: flex; flex-wrap: wrap; gap: 7px; }
+.reference-suggestion-button {
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid rgba(52,199,89,.48);
+  border-radius: 999px;
+  background: rgba(52,199,89,.14);
+  color: #72e08b;
+  font-size: 13px;
+  font-weight: 850;
+  line-height: 1.2;
+  cursor: pointer;
+}
+.reference-suggestion-button:first-child {
+  background: #e9f9ed;
+  color: #167a32;
+  border-color: #b9edc5;
+}
+.reference-suggestion-button:active { transform: scale(.98); }
+
 .reference-match-status {
   margin: 10px 0 0;
   font-size: 13px;

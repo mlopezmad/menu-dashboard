@@ -1,0 +1,11 @@
+MENÚ DASHBOARD · V11.7
+AUTOCOMPLETADO INTELIGENTE
+
+- Añade sugerencias de catálogo durante la revisión dentro del visor de celda.
+- Combina coincidencia por texto, palabras, prefijos y distancia de edición.
+- Prioriza la sugerencia generada por el OCR cuando existe.
+- Permite aplicar una propuesta con un solo toque.
+- También permite aceptar la primera sugerencia con Tab o flecha derecha al final del texto.
+- Oculta las sugerencias cuando el plato ya coincide exactamente con el catálogo.
+- Mantiene el aprendizaje de correcciones de versiones anteriores.
+- No cambia calibración, recortes, publicación, GitHub ni menu.json.

@@ -1317,6 +1317,60 @@ function textoCoincideConCatalogo(texto) {
   return diccionarioPlatos().some(plato => normalizarOcr(plato) === normal);
 }
 
+function sugerenciasCatalogo(texto, original = "", limite = 3) {
+  const consultaVisible = String(texto || "").trim();
+  const consultaOriginal = String(original || "").trim();
+  const consulta = consultaVisible.length >= 2 ? consultaVisible : consultaOriginal;
+  const normal = normalizarOcr(consulta).replace(/\s+/g, " ").trim();
+  if (!normal) return [];
+
+  const tokensConsulta = normal.split(" ").filter(Boolean);
+  const resultados = diccionarioPlatos().map(plato => {
+    const np = normalizarOcr(plato).replace(/\s+/g, " ").trim();
+    const ratio = distanciaLevenshtein(normal, np) / Math.max(normal.length, np.length, 1);
+    const lev = 1 - ratio;
+    const tokens = similitudTokens(consulta, plato);
+    const prefijo = np.startsWith(normal) || normal.startsWith(np) ? .30 : 0;
+    const palabraInicial = tokensConsulta.some(t => t.length >= 2 && np.split(" ").some(p => p.startsWith(t))) ? .16 : 0;
+    const contiene = normal.length >= 3 && (np.includes(normal) || normal.includes(np)) ? .18 : 0;
+    const score = Math.min(1.2, lev * .56 + tokens * .30 + prefijo + palabraInicial + contiene);
+    return { plato, score, ratio };
+  }).filter(x => normalizarOcr(x.plato) !== normal)
+    .sort((a,b) => b.score - a.score || a.ratio - b.ratio);
+
+  const umbral = consultaVisible.length <= 1 ? .70 : consultaVisible.length <= 3 ? .54 : .46;
+  return resultados.filter(x => x.score >= umbral || x.ratio <= .34).slice(0, limite);
+}
+
+function renderizarSugerenciasReferencia() {
+  const caja = $("reference-suggestions");
+  const lista = $("reference-suggestions-list");
+  const input = $("reference-edit-input");
+  if (!caja || !lista || !input || !campoRevisionActivo) return;
+  const original = campoRevisionActivo.dataset.ocrOriginal || "";
+  let sugerencias = sugerenciasCatalogo(input.value, original, 3);
+  const sugerenciaPrevia = campoRevisionActivo.dataset.ocrSugerencia || "";
+  if (sugerenciaPrevia && !textoCoincideConCatalogo(input.value)) {
+    sugerencias = [{ plato: sugerenciaPrevia, score: 1, ratio: 0 }, ...sugerencias.filter(x => normalizarOcr(x.plato) !== normalizarOcr(sugerenciaPrevia))].slice(0,3);
+  }
+  lista.innerHTML = "";
+  caja.hidden = !sugerencias.length || textoCoincideConCatalogo(input.value);
+  if (caja.hidden) return;
+  for (const item of sugerencias) {
+    const boton = document.createElement("button");
+    boton.type = "button";
+    boton.className = "reference-suggestion-button";
+    boton.textContent = item.plato;
+    boton.addEventListener("click", () => {
+      input.value = item.plato;
+      aplicarEdicionDesdeReferencia();
+      input.focus({ preventScroll: true });
+      input.setSelectionRange(input.value.length, input.value.length);
+    });
+    lista.appendChild(boton);
+  }
+}
+
 function actualizarEditorReferencia() {
   const editor = $("reference-editor");
   const input = $("reference-edit-input");
@@ -1336,6 +1390,7 @@ function actualizarEditorReferencia() {
   estado.textContent = coincide
     ? "✓ Plato reconocido. Coincide con el catálogo."
     : "Comprueba el texto con la celda original.";
+  renderizarSugerenciasReferencia();
 
   const pendientes = camposPendientesRevision();
   const barra = document.getElementById("guided-review-bar");
@@ -1842,6 +1897,14 @@ function prepararEventos() {
   $("reference-show-cell")?.addEventListener("click", () => mostrarModoReferencia("celda"));
   $("reference-show-full")?.addEventListener("click", () => mostrarModoReferencia("completo"));
   $("reference-edit-input")?.addEventListener("input", aplicarEdicionDesdeReferencia);
+  $("reference-edit-input")?.addEventListener("keydown", event => {
+    if (!["Tab", "ArrowRight"].includes(event.key)) return;
+    const boton = $("reference-suggestions-list")?.querySelector(".reference-suggestion-button");
+    if (!boton || $("reference-suggestions")?.hidden) return;
+    if (event.key === "ArrowRight" && event.currentTarget.selectionStart !== event.currentTarget.value.length) return;
+    event.preventDefault();
+    boton.click();
+  });
   $("reference-review-close")?.addEventListener("click", cerrarReferencia);
   $("reference-review-next")?.addEventListener("click", () => {
     aplicarEdicionDesdeReferencia();
