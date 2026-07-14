@@ -1275,3 +1275,12 @@ input {
 @media (prefers-color-scheme: dark) {
   .crop-panel, .ocr-day-card { background: rgba(255,255,255,.06); }
 }
+
+/* V4.2 · revisión estructurada del OCR */
+.ocr-day-card h4 { margin: 18px 0 10px; font-size: 16px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.ocr-structured-list { display: grid; gap: 9px; }
+.ocr-structured-row { display: grid; grid-template-columns: 32px minmax(0,1fr); gap: 9px; align-items: center; }
+.ocr-structured-row > span { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 999px; background: rgba(227,6,19,.1); color: var(--red); font-weight: 800; }
+.ocr-structured-row input { width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 14px; padding: 13px 14px; background: var(--field); color: var(--text); font: inherit; font-weight: 650; }
+.ocr-structured-row input:focus { outline: 3px solid rgba(227,6,19,.16); border-color: var(--red); }
+@media (max-width: 520px) { .ocr-day-card { padding: 18px; } .ocr-structured-row { grid-template-columns: 28px minmax(0,1fr); gap: 7px; } .ocr-structured-row > span { width:28px;height:28px; } }

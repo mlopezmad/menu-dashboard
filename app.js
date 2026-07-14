@@ -326,88 +326,197 @@ function crearPlantillaSemana() {
     $("ocr-progreso").className = "editor-message message-error";
     return;
   }
-  pintarTextosDias(Array.from({ length: 5 }, (_, i) => `PRIMEROS:\n- \nSEGUNDOS:\n- `));
+  pintarFormularioDias(Array.from({ length: 5 }, () => ({ primeros: ["", "", ""], segundos: ["", "", ""] })));
   $("revision-ocr").hidden = false;
   $("resultado-importacion").hidden = true;
 }
 
+function normalizarOcr(texto) {
+  return String(texto || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase();
+}
+
 function limpiarLineaOcr(linea) {
-  return linea
-    .replace(/^[•·▪◦*_=|\-–—.]+\s*/, "")
-    .replace(/[|_=]{2,}/g, " ")
+  return String(linea || "")
+    .replace(/[\[\]{}<>]/g, " ")
+    .replace(/^[•·▪◦*_=|\\/\-–—.:;,()0-9]+\s*/, "")
+    .replace(/\s+[•·▪◦*_=|\\/\-–—.:;,()0-9]+$/g, "")
+    .replace(/\b(?:ED|EZ|EO|OE|EE|EC|CE|EJ|GG|UC)\)?\b/gi, " ")
+    .replace(/\([^)]{0,5}\)/g, " ")
+    .replace(/[|_=~^`´“”]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
 
 function esRuidoOcr(linea) {
   const texto = limpiarLineaOcr(linea);
-  if (!texto) return true;
-  if (texto.length <= 2) return true;
-  if (!/[A-ZÁÉÍÓÚÜÑ]/i.test(texto)) return true;
-  const letras = (texto.match(/[A-ZÁÉÍÓÚÜÑ]/gi) || []).length;
-  const raros = (texto.match(/[^A-ZÁÉÍÓÚÜÑ0-9 ,.'()\-/]/gi) || []).length;
-  if (raros > letras) return true;
-  if (/^(MAHOU|SANMIGUEL|SEMANA|MENU|MENÚ)$/i.test(texto)) return true;
+  if (!texto || texto.length < 3) return true;
+  const normal = normalizarOcr(texto);
+  if (!/[A-Z]/.test(normal)) return true;
+  const letras = (normal.match(/[A-Z]/g) || []).length;
+  const palabras = normal.match(/[A-Z]{2,}/g) || [];
+  if (letras < 3 || !palabras.length) return true;
+  if (/^(MAHOU|SANMIGUEL|SEMANA|MENU|MENÚ|DIETA|PLANCHA)$/.test(normal)) return true;
+  if (/^(E|EO|OE|EE|ED|EZ|GG|UC|SA|M|C|O)$/.test(normal)) return true;
   return false;
 }
 
 function normalizarEncabezado(texto) {
-  return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+  return normalizarOcr(texto);
 }
 
 function detectarSeccion(linea) {
   const normal = normalizarEncabezado(linea);
-  if (/PRIMER(OS|O)|ENTRANTE/.test(normal)) return "primeros";
-  if (/SEGUND(OS|O)|PRINCIPAL/.test(normal)) return "segundos";
-  if (/DIETA Y PLANCHA|DIETA|SALUDABLE/.test(normal)) return "fin";
+  if (/PRIMER/.test(normal)) return "primeros";
+  if (/SEGUND|SEGU.D|SE.GUND/.test(normal)) return "segundos";
+  if (/DIETA|SALUDABLE/.test(normal)) return "fin";
   return null;
 }
 
+function distanciaLevenshtein(a, b) {
+  const x = normalizarOcr(a), y = normalizarOcr(b);
+  const fila = Array.from({ length: y.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= x.length; i++) {
+    let anterior = fila[0]; fila[0] = i;
+    for (let j = 1; j <= y.length; j++) {
+      const temp = fila[j];
+      fila[j] = Math.min(fila[j] + 1, fila[j - 1] + 1, anterior + (x[i - 1] === y[j - 1] ? 0 : 1));
+      anterior = temp;
+    }
+  }
+  return fila[y.length];
+}
+
+function diccionarioPlatos() {
+  const base = [
+    "Lentejas castellanas", "Menestra de verduras", "Ensalada de temporada", "Libritos de lomo con jamón y queso",
+    "Contra de ternera asada", "Merluza al horno con verduras asadas", "Brócoli rehogado", "Falso risotto con setas",
+    "Ensalada de queso", "Pechuga de pollo a la plancha", "Albóndigas con tomate", "Boquerones a la andaluza",
+    "Sopa castellana", "Guisantes a la portuguesa", "Ensalada mixta", "Secreto a la plancha", "Ternera con setas",
+    "Lubina a la plancha", "Fabada asturiana", "Revuelto de morcilla", "Ensaladilla alemana", "Musaka",
+    "Filete de cerdo a la madrileña", "Dorada a la plancha", "Arroz campero", "Crema de verduras",
+    "Empanada de atún", "Callos a la madrileña", "Atún plancha", "Fideuá marinera", "Crema de calabacín",
+    "Huevos rotos con torreznillos", "Salchichas frescas encebolladas", "Colitas de rape en salsa"
+  ];
+  for (const dia of Object.values(menuPublicado?.dias || {})) {
+    for (const tipo of ["primeros", "segundos"]) for (const plato of dia?.[tipo] || []) base.push(plato);
+  }
+  return [...new Set(base.map(x => String(x).trim()).filter(Boolean))];
+}
+
+function corregirConDiccionario(texto) {
+  const limpio = limpiarLineaOcr(texto);
+  if (!limpio) return "";
+  const normal = normalizarOcr(limpio);
+  let mejor = null, ratio = 1;
+  for (const plato of diccionarioPlatos()) {
+    const d = distanciaLevenshtein(normal, plato);
+    const r = d / Math.max(normal.length, normalizarOcr(plato).length, 1);
+    if (r < ratio) { ratio = r; mejor = plato; }
+  }
+  return ratio <= 0.24 ? mejor : limpio
+    .toLocaleLowerCase("es-ES")
+    .replace(/(^|\s)([a-záéíóúüñ])/g, (_, a, b) => a + b.toLocaleUpperCase("es-ES"));
+}
+
+function esContinuacion(linea, anterior) {
+  const n = normalizarOcr(linea), a = normalizarOcr(anterior);
+  const palabras = n.split(/\s+/).filter(Boolean);
+  if (palabras.length <= 1) return true;
+  if (/\b(A|AL|DE|DEL|CON|EN|LA|LAS|LOS|Y)$/.test(a)) return true;
+  if (/^(A|AL|DE|DEL|CON|EN|LA|LAS|LOS|Y)\b/.test(n)) return true;
+  return false;
+}
+
+function compactarLineas(lineas) {
+  const salida = [];
+  for (const original of lineas) {
+    const linea = limpiarLineaOcr(original);
+    if (esRuidoOcr(linea)) continue;
+    if (salida.length && esContinuacion(linea, salida[salida.length - 1])) salida[salida.length - 1] += ` ${linea}`;
+    else salida.push(linea);
+  }
+  return salida;
+}
+
+function costeGrupo(lineas) {
+  const texto = limpiarLineaOcr(lineas.join(" "));
+  if (!texto) return 100;
+  let mejor = 1;
+  for (const plato of diccionarioPlatos()) {
+    const r = distanciaLevenshtein(texto, plato) / Math.max(normalizarOcr(texto).length, normalizarOcr(plato).length, 1);
+    mejor = Math.min(mejor, r);
+  }
+  const palabras = texto.split(/\s+/).length;
+  const longitud = texto.length < 5 ? 3 : texto.length > 75 ? 2 : 0;
+  return mejor * 4 + Math.abs(palabras - 4) * 0.05 + longitud;
+}
+
+function dividirEnTres(lineas) {
+  const limpias = compactarLineas(lineas);
+  if (limpias.length <= 3) return [...limpias, "", ""].slice(0, 3).map(corregirConDiccionario);
+  let mejor = null;
+  for (let i = 1; i < limpias.length - 1; i++) {
+    for (let j = i + 1; j < limpias.length; j++) {
+      const grupos = [limpias.slice(0, i), limpias.slice(i, j), limpias.slice(j)];
+      const coste = grupos.reduce((s, g) => s + costeGrupo(g), 0);
+      if (!mejor || coste < mejor.coste) mejor = { coste, grupos };
+    }
+  }
+  return mejor.grupos.map(g => corregirConDiccionario(g.join(" ")));
+}
+
 function parsearTextoDia(texto) {
-  const dia = {
-    primeros: [],
-    segundos: [],
-    dieta: ["Primero de dieta", "Carne plancha", "Pescado plancha"]
-  };
-  const lineas = texto.split(/\r?\n/).map(limpiarLineaOcr).filter(linea => !esRuidoOcr(linea));
+  const lineasBase = String(texto || "").split(/\r?\n/).map(limpiarLineaOcr);
+  const lineas = lineasBase.filter(linea => !esRuidoOcr(linea));
+  const porSeccion = { primeros: [], segundos: [] };
   let seccion = null;
   for (const linea of lineas) {
     const detectada = detectarSeccion(linea);
     if (detectada === "fin") break;
-    if (detectada) {
-      seccion = detectada;
-      continue;
-    }
-    const normal = normalizarEncabezado(linea);
+    if (detectada) { seccion = detectada; continue; }
+    const normal = normalizarOcr(linea);
     if (/^(LUNES|MARTES|MIERCOLES|JUEVES|VIERNES)\b/.test(normal)) continue;
-    if (seccion === "primeros" || seccion === "segundos") dia[seccion].push(linea);
+    if (seccion) porSeccion[seccion].push(linea);
   }
-  for (const tipo of ["primeros", "segundos"]) {
-    dia[tipo] = dia[tipo]
-      .map(limpiarLineaOcr)
-      .filter(x => x && !esRuidoOcr(x))
-      .slice(0, 3);
-  }
-  return dia;
+  return {
+    primeros: dividirEnTres(porSeccion.primeros),
+    segundos: dividirEnTres(porSeccion.segundos),
+    dieta: ["Primero de dieta", "Carne plancha", "Pescado plancha"]
+  };
 }
 
-function textosDiasActuales() {
-  return Array.from(document.querySelectorAll(".ocr-day-text")).map(el => el.value);
+function leerFormularioDias() {
+  return Array.from(document.querySelectorAll(".ocr-day-card")).map(card => ({
+    primeros: Array.from(card.querySelectorAll('[data-tipo="primeros"]')).map(el => el.value.trim()),
+    segundos: Array.from(card.querySelectorAll('[data-tipo="segundos"]')).map(el => el.value.trim()),
+    dieta: ["Primero de dieta", "Carne plancha", "Pescado plancha"]
+  }));
 }
 
-function pintarTextosDias(textos) {
+function pintarFormularioDias(dias) {
   const contenedor = $("ocr-dias");
   contenedor.innerHTML = "";
-  textos.forEach((texto, indice) => {
+  dias.forEach((dia, indice) => {
     const bloque = document.createElement("article");
     bloque.className = "ocr-day-card";
-    const titulo = document.createElement("h3");
-    titulo.textContent = nombreDiaDesdeIndice(indice);
-    const area = document.createElement("textarea");
-    area.className = "ocr-text ocr-day-text";
-    area.spellcheck = true;
-    area.value = texto || "PRIMEROS:\n\nSEGUNDOS:\n";
-    bloque.append(titulo, area);
+    const titulo = document.createElement("h3"); titulo.textContent = nombreDiaDesdeIndice(indice);
+    bloque.appendChild(titulo);
+    for (const tipo of ["primeros", "segundos"]) {
+      const subtitulo = document.createElement("h4"); subtitulo.textContent = tipo === "primeros" ? "Primeros" : "Segundos";
+      bloque.appendChild(subtitulo);
+      const lista = document.createElement("div"); lista.className = "ocr-structured-list";
+      for (let i = 0; i < 3; i++) {
+        const fila = document.createElement("label"); fila.className = "ocr-structured-row";
+        const numero = document.createElement("span"); numero.textContent = `${i + 1}`;
+        const input = document.createElement("input"); input.type = "text"; input.dataset.tipo = tipo;
+        input.value = dia?.[tipo]?.[i] || ""; input.placeholder = `${tipo === "primeros" ? "Primer" : "Segundo"} plato ${i + 1}`;
+        fila.append(numero, input); lista.appendChild(fila);
+      }
+      bloque.appendChild(lista);
+    }
     contenedor.appendChild(bloque);
   });
 }
@@ -416,15 +525,13 @@ function prepararSemanaDesdeTexto() {
   const lunes = $("lunes-semana").value;
   if (!lunes) return window.alert("Selecciona el lunes de la semana.");
   const fechas = fechasSemana(lunes);
-  const textos = textosDiasActuales();
-  if (textos.length !== 5) return window.alert("Primero lee la foto o crea una plantilla.");
-  const dias = {};
-  const errores = [];
-  textos.forEach((texto, i) => {
-    const dia = parsearTextoDia(texto);
+  const diasFormulario = leerFormularioDias();
+  if (diasFormulario.length !== 5) return window.alert("Primero lee la foto o crea una plantilla.");
+  const dias = {}, errores = [];
+  diasFormulario.forEach((dia, i) => {
     dias[fechas[i]] = dia;
     for (const tipo of ["primeros", "segundos"]) {
-      if (dia[tipo].length !== 3) errores.push(`${nombreDiaDesdeIndice(i)}: deben quedar 3 ${tipo}.`);
+      if (dia[tipo].some(x => !x)) errores.push(`${nombreDiaDesdeIndice(i)}: completa los 3 ${tipo}.`);
     }
   });
   if (errores.length) {
@@ -583,7 +690,7 @@ async function leerFotoConOcr() {
       const { data } = await worker.recognize(crearCanvasColumna(i));
       textos.push((data?.text||"").trim());
     }
-    pintarTextosDias(textos);
+    pintarFormularioDias(textos.map(parsearTextoDia));
     $("revision-ocr").hidden=false; $("resultado-importacion").hidden=true;
     $("ocr-progreso").textContent="Lectura por días terminada. Revisa cada columna.";
     $("ocr-progreso").className="editor-message message-success";
