@@ -1197,6 +1197,12 @@ function actualizarReferenciaEditor() {
 
 function actualizarReferenciaRevision() {
   actualizarBotonReferenciaFlotante();
+  const tarjeta = $("referencia-compacta");
+  const imagen = $("referencia-compacta-img");
+  if (!tarjeta || !imagen) return;
+  const visible = Boolean(imagenReferenciaImportacion && $("revision-ocr") && !$("revision-ocr").hidden);
+  tarjeta.hidden = !visible;
+  if (visible && imagen.src !== imagenReferenciaImportacion) imagen.src = imagenReferenciaImportacion;
 }
 
 function abrirReferencia() {
@@ -1586,7 +1592,7 @@ async function leerFotoConOcr() {
 
 async function fotoSeleccionada() {
   const archivo=$("foto-menu").files?.[0];
-  $("leer-foto").disabled=!archivo; $("revision-ocr").hidden=true; $("resultado-importacion").hidden=true;
+  $("leer-foto").disabled=!archivo; $("revision-ocr").hidden=true; $("resultado-importacion").hidden=true; actualizarReferenciaRevision();
   if (!archivo) { fuenteImportacion=null; limpiarReferenciaSesion(); limitesFilasDetectados=null; $("recorte-panel").hidden=true; actualizarReferenciaRevision(); return; }
   $("ocr-progreso").textContent="Preparando vista previa…"; $("ocr-progreso").className="editor-message message-info";
   try {
@@ -1656,6 +1662,8 @@ function prepararEventos() {
   $("referencia-flotante").addEventListener("click", abrirReferencia);
   $("cerrar-referencia").addEventListener("click", cerrarReferencia);
   $("reference-dialog").addEventListener("click", event => { if (event.target === $("reference-dialog")) cerrarReferencia(); });
+  $("ampliar-referencia-compacta")?.addEventListener("click", abrirReferencia);
+  $("abrir-referencia-compacta")?.addEventListener("click", abrirReferencia);
   window.addEventListener("beforeunload", event => { if (hayCambios) { event.preventDefault(); event.returnValue = ""; } });
 }
 

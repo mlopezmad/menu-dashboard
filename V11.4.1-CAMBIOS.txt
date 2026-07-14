@@ -1,0 +1,8 @@
+V11.4.1 · Corrección de referencia visible
+
+- Recupera una miniatura compacta de la foto original dentro de la revisión OCR.
+- La miniatura aparece encima del resumen de platos y no se superpone al contenido.
+- Los botones “Ampliar” y la propia miniatura abren el visor a pantalla completa.
+- Se mantiene el botón flotante “Ver menú” para consultar la imagen en cualquier punto.
+- La foto continúa disponible en revisión, vista semanal y editor diario durante la sesión/borrador.
+- No se modifican OCR, calibración, comparación, publicación ni menu.json.
