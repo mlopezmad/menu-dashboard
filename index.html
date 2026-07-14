@@ -17,63 +17,188 @@
 <body>
   <main class="dashboard">
     <div class="app-toolbar" aria-label="Controles del Dashboard">
-      <div class="app-identity"><img src="icon-192.png" alt="" class="app-mark"><span>Menú Dashboard</span></div>
+      <div class="app-identity">
+        <img src="icon-192.png" alt="" class="app-mark">
+        <span>Menú Dashboard</span>
+      </div>
       <button id="cerrar-sesion" class="logout-button" type="button">Salir</button>
     </div>
 
     <section id="vista-inicio">
       <header class="dashboard-header">
-        <p class="eyebrow">Menú comedor · V4</p>
+        <p class="eyebrow">Menú comedor · V4.1</p>
         <h1>Gestor del menú</h1>
         <p class="intro">Actualiza, revisa y publica el menú semanal desde el móvil.</p>
       </header>
+
       <section class="dashboard-grid">
         <article class="panel-card">
-          <div class="panel-icon" aria-hidden="true">↑</div><h2>Subir menú</h2>
-          <p>Procesa una imagen o un PDF y revisa los platos antes de publicar.</p>
-          <button type="button" disabled>Próximamente</button>
+          <div class="panel-icon" aria-hidden="true">↑</div>
+          <h2>Subir menú</h2>
+          <p>Lee una foto con OCR gratuito, revisa la semana y añade solo lo necesario.</p>
+          <button id="abrir-importador" class="primary-action" type="button">Subir foto semanal</button>
         </article>
+
         <article class="panel-card">
-          <div class="panel-icon" aria-hidden="true">✎</div><h2>Editar menú</h2>
+          <div class="panel-icon" aria-hidden="true">✎</div>
+          <h2>Editar menú</h2>
           <p>Edita días existentes, crea nuevas fechas y publica directamente.</p>
           <button id="abrir-editor" class="primary-action" type="button">Abrir editor</button>
         </article>
       </section>
-      <section class="status-card"><div><p class="status-label">Estado</p><h2 id="estado-titulo">Comprobando menú…</h2><p id="estado-detalle">Conectando con GitHub.</p></div><span id="estado-punto" class="status-dot status-loading" aria-hidden="true"></span></section>
-      <section class="status-card menu-summary"><div><p class="status-label">Menú publicado</p><h2 id="resumen-titulo">Cargando fechas…</h2><p id="resumen-detalle">Esperando información de menu.json.</p></div></section>
+
+      <section class="status-card">
+        <div>
+          <p class="status-label">Estado</p>
+          <h2 id="estado-titulo">Comprobando menú…</h2>
+          <p id="estado-detalle">Conectando con el menú publicado.</p>
+        </div>
+        <span id="estado-punto" class="status-dot status-loading" aria-hidden="true"></span>
+      </section>
+
+      <section class="status-card menu-summary">
+        <div>
+          <p class="status-label">Menú publicado</p>
+          <h2 id="resumen-titulo">Cargando fechas…</h2>
+          <p id="resumen-detalle">Esperando información del archivo menu.json.</p>
+        </div>
+      </section>
+    </section>
+
+
+    <section id="vista-importador" class="editor-view" hidden>
+      <header class="editor-header">
+        <button id="volver-importador" class="back-button" type="button">← Volver</button>
+        <p class="eyebrow">Importador · V4.1</p>
+        <h1>Subir menú semanal</h1>
+        <p class="intro">Selecciona la foto, revisa el texto detectado y añade la semana sin borrar los días publicados.</p>
+      </header>
+
+      <section class="editor-selector-card import-card">
+        <div class="import-controls">
+          <div>
+            <label for="foto-menu">Foto del menú</label>
+            <input id="foto-menu" type="file" accept="image/*" capture="environment">
+          </div>
+          <div>
+            <label for="lunes-semana">Lunes de la semana</label>
+            <input id="lunes-semana" type="date">
+          </div>
+        </div>
+        <img id="foto-preview" class="photo-preview" alt="Vista previa del menú" hidden>
+        <div class="editor-actions import-actions">
+          <button id="leer-foto" class="primary-action" type="button" disabled>Leer foto</button>
+        </div>
+        <div id="ocr-progreso" class="editor-message" role="status" aria-live="polite"></div>
+      </section>
+
+      <section id="revision-ocr" class="editor-day-card import-review" hidden>
+        <p class="status-label">Texto detectado</p>
+        <h2>Revisa antes de preparar la semana</h2>
+        <p class="import-help">El OCR es gratuito y puede cometer errores. Corrige el texto y conserva los encabezados de cada día. Usa las secciones PRIMEROS, SEGUNDOS y DIETA.</p>
+        <textarea id="texto-ocr" class="ocr-text" spellcheck="true"></textarea>
+        <div class="editor-actions">
+          <button id="plantilla-semana" class="secondary-action" type="button">Crear plantilla</button>
+          <button id="preparar-semana" class="primary-action publish-button" type="button">Preparar semana</button>
+        </div>
+      </section>
+
+      <section id="resultado-importacion" class="editor-day-card import-result" hidden>
+        <p class="status-label">Comparación</p>
+        <h2 id="resultado-titulo">Semana preparada</h2>
+        <div id="resultado-detalle" class="comparison-list"></div>
+        <label id="permitir-actualizaciones-wrap" class="festivo-toggle" hidden>
+          <input id="permitir-actualizaciones" type="checkbox">
+          <span>
+            <strong>Permitir actualizar días ya publicados</strong>
+            <small>Solo úsalo cuando la foto contenga cambios reales en una fecha existente.</small>
+          </span>
+        </label>
+        <div class="editor-actions">
+          <button id="aplicar-semana" class="primary-action publish-button" type="button" disabled>Revisar en editor</button>
+        </div>
+        <div id="importador-mensaje" class="editor-message" role="status" aria-live="polite"></div>
+      </section>
     </section>
 
     <section id="vista-editor" class="editor-view" hidden>
       <header class="editor-header">
         <button id="volver-inicio" class="back-button" type="button">← Volver</button>
-        <p class="eyebrow">Editor · V4</p><h1>Editar menú</h1>
-        <p class="intro">Modifica los platos, crea fechas y publica cuando esté todo revisado.</p>
+        <p class="eyebrow">Editor · V4.1</p>
+        <h1>Editar menú</h1>
+        <p class="intro">Selecciona una fecha, modifica los platos y publica cuando esté revisado.</p>
       </header>
 
-      <section class="editor-selector-card editor-controls">
-        <div class="field-grow"><label for="selector-fecha">Fecha</label><select id="selector-fecha"><option value="">Cargando fechas…</option></select></div>
-        <button id="nueva-fecha" class="secondary-action" type="button">+ Nueva fecha</button>
+      <section class="editor-selector-card">
+        <div class="selector-grid">
+          <div>
+            <label for="selector-fecha">Fecha publicada</label>
+            <select id="selector-fecha"><option value="">Cargando fechas…</option></select>
+          </div>
+          <div>
+            <label for="nueva-fecha">Crear una fecha</label>
+            <div class="inline-control">
+              <input id="nueva-fecha" type="date">
+              <button id="crear-fecha" class="secondary-action" type="button">Crear</button>
+            </div>
+          </div>
+        </div>
       </section>
 
       <section id="editor-contenido" class="editor-content" hidden>
         <article class="editor-day-card">
-          <div class="editor-day-header"><div><p class="status-label">Día seleccionado</p><h2 id="editor-fecha">—</h2></div><span id="cambios-badge" class="read-only-badge">Sin cambios</span></div>
-          <label class="festivo-toggle"><input id="editor-festivo" type="checkbox"><span>Marcar como festivo</span></label>
+          <div class="editor-day-header">
+            <div>
+              <p class="status-label">Día seleccionado</p>
+              <h2 id="editor-fecha">—</h2>
+            </div>
+            <span id="cambios-badge" class="read-only-badge">Sin cambios</span>
+          </div>
+
+          <label class="festivo-toggle">
+            <input id="editor-festivo" type="checkbox">
+            <span>
+              <strong>Festivo / sin servicio</strong>
+              <small>Oculta los platos de este día en la aplicación.</small>
+            </span>
+          </label>
+
           <div id="grupos-menu">
-            <div class="editor-group"><div class="group-title-row"><h3>Primeros</h3><button class="add-item" data-list="primeros" type="button">+ Añadir</button></div><div id="editor-primeros" class="editor-list"></div></div>
-            <div class="editor-group"><div class="group-title-row"><h3>Segundos</h3><button class="add-item" data-list="segundos" type="button">+ Añadir</button></div><div id="editor-segundos" class="editor-list"></div></div>
-            <div class="editor-group"><div class="group-title-row"><h3>Dieta y plancha</h3><button class="add-item" data-list="dieta" type="button">+ Añadir</button></div><div id="editor-dieta" class="editor-list"></div></div>
+            <div class="editor-group">
+              <div class="group-heading"><h3>Primeros</h3><button class="add-item" data-list="primeros" type="button">+ Añadir</button></div>
+              <div id="editor-primeros" class="editor-list"></div>
+            </div>
+            <div class="editor-group">
+              <div class="group-heading"><h3>Segundos</h3><button class="add-item" data-list="segundos" type="button">+ Añadir</button></div>
+              <div id="editor-segundos" class="editor-list"></div>
+            </div>
+            <div class="editor-group">
+              <div class="group-heading"><h3>Dieta y plancha</h3><button class="add-item" data-list="dieta" type="button">+ Añadir</button></div>
+              <div id="editor-dieta" class="editor-list"></div>
+            </div>
           </div>
+
+          <div id="editor-mensaje" class="editor-message" role="status" aria-live="polite"></div>
+
           <div class="editor-actions">
-            <button id="eliminar-fecha" class="danger-action" type="button">Eliminar fecha</button>
-            <div class="actions-right"><button id="descartar-cambios" class="secondary-action" type="button" disabled>Descartar</button><button id="publicar-menu" class="primary-action publish-action" type="button" disabled>Publicar cambios</button></div>
+            <button id="descartar-cambios" class="secondary-action" type="button" disabled>Descartar</button>
+            <button id="eliminar-fecha" class="danger-action" type="button">Eliminar día</button>
+            <button id="publicar-menu" class="primary-action publish-button" type="button" disabled>Publicar cambios</button>
           </div>
-          <p id="editor-mensaje" class="editor-message" role="status" aria-live="polite"></p>
+          <p class="editor-note">La publicación actualiza <strong>Menu-comedor/menu.json</strong>. Antes de guardar se comprueba que nadie haya modificado el archivo.</p>
         </article>
       </section>
-      <section id="editor-vacio" class="status-card"><div><p class="status-label">Editor</p><h2>Selecciona o crea una fecha</h2><p>El menú aparecerá aquí para editarlo.</p></div></section>
+
+      <section id="editor-vacio" class="status-card">
+        <div>
+          <p class="status-label">Editor</p>
+          <h2>Selecciona o crea una fecha</h2>
+          <p>El menú aparecerá aquí listo para editar.</p>
+        </div>
+      </section>
     </section>
   </main>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
