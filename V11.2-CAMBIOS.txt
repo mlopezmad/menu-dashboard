@@ -1,0 +1,9 @@
+MENÚ DASHBOARD · V11.2
+
+- Añade selector Semana | Día en el editor.
+- La vista Semana muestra juntos todos los días disponibles con primeros, segundos y dieta.
+- Cada día puede abrirse en el editor detallado con un toque.
+- Las tarjetas de inicio distinguen semanas completas, parciales y días sueltos.
+- Los días sueltos se muestran con una fecha natural, no como un rango repetido.
+- La imagen original del borrador también aparece en la vista semanal.
+- No cambia OCR, calibración, comparación, menu.json ni publicación.

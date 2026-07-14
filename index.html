@@ -26,7 +26,7 @@
 
     <section id="vista-inicio">
       <header class="dashboard-header">
-        <p class="eyebrow">Menú comedor · V11.1</p>
+        <p class="eyebrow">Menú comedor · V11.2</p>
         <h1>Gestor del menú</h1>
         <p class="intro">Actualiza, revisa y publica el menú semanal desde el móvil.</p>
       </header>
@@ -70,7 +70,7 @@
     <section id="vista-importador" class="editor-view" hidden>
       <header class="editor-header">
         <button id="volver-importador" class="back-button" type="button">← Volver</button>
-        <p class="eyebrow">Importador · V11.1</p>
+        <p class="eyebrow">Importador · V11.2</p>
         <h1>Subir menú semanal</h1>
         <p class="intro">Selecciona una foto o un PDF, ajusta el recorte y lee cada día por separado sin borrar los días publicados.</p>
       </header>
@@ -183,12 +183,16 @@
     <section id="vista-editor" class="editor-view" hidden>
       <header class="editor-header">
         <button id="volver-inicio" class="back-button" type="button">← Volver</button>
-        <p class="eyebrow">Editor · V11.1</p>
+        <p class="eyebrow">Editor · V11.2</p>
         <h1>Editar menú</h1>
         <p class="intro">Selecciona una fecha, modifica los platos y publica cuando esté revisado.</p>
       </header>
 
       <section class="editor-selector-card">
+        <div class="editor-view-switch" role="group" aria-label="Vista del editor">
+          <button id="vista-semana-btn" class="view-switch-button is-active" type="button">Semana</button>
+          <button id="vista-dia-btn" class="view-switch-button" type="button">Día</button>
+        </div>
         <div class="selector-grid">
           <div>
             <label for="selector-fecha">Fecha publicada</label>
@@ -202,6 +206,34 @@
             </div>
           </div>
         </div>
+      </section>
+
+      <section id="editor-semana" class="editor-content weekly-editor" hidden>
+        <article class="editor-day-card">
+          <div class="editor-day-header">
+            <div>
+              <p class="status-label">Vista semanal</p>
+              <h2 id="semana-titulo">—</h2>
+              <p id="semana-detalle" class="week-view-detail"></p>
+            </div>
+            <span id="semana-estado" class="read-only-badge">Publicada</span>
+          </div>
+
+          <section id="semana-referencia" class="reference-card" hidden>
+            <div class="reference-heading">
+              <div>
+                <p class="status-label">Menú original</p>
+                <h3>Referencia de la semana importada</h3>
+              </div>
+              <button id="ampliar-referencia-semana" class="secondary-action" type="button">Ampliar</button>
+            </div>
+            <div class="reference-viewport">
+              <img id="semana-referencia-img" alt="Foto original del menú importado">
+            </div>
+          </section>
+
+          <div id="semana-dias" class="weekly-days-grid"></div>
+        </article>
       </section>
 
       <section id="editor-contenido" class="editor-content" hidden>

@@ -1677,3 +1677,40 @@ body.guided-review-open { padding-bottom: 96px; }
   .week-row { background: rgba(255,255,255,.055); border-color: rgba(255,255,255,.05); }
   .reference-card { background: rgba(227,6,19,.08); }
 }
+
+
+/* V11.2 · Vista semanal y semanas escalables */
+.editor-view-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; width: min(100%, 360px); margin: 0 0 20px; padding: 4px; border-radius: 15px; background: rgba(17,17,17,.06); }
+.view-switch-button { min-height: 42px; padding: 9px 15px; border-radius: 12px; color: var(--muted); font-size: 14px; font-weight: 900; cursor: pointer; }
+.view-switch-button.is-active { background: var(--surface); color: var(--text); box-shadow: 0 5px 16px rgba(17,17,17,.10); }
+.week-row-side { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
+.week-state { display: inline-flex; align-items: center; min-height: 27px; padding: 5px 9px; border-radius: 999px; font-size: 11px; font-weight: 900; font-style: normal; letter-spacing: .02em; }
+.week-state.is-complete, .week-status.is-complete { color: #18733a; background: rgba(41,173,88,.13); }
+.week-state.is-partial, .week-status.is-partial { color: #a75d00; background: rgba(255,149,0,.15); }
+.week-view-detail { margin: 7px 0 0; color: var(--muted); font-size: 14px; line-height: 1.45; }
+.weekly-days-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 22px; }
+.weekly-day-card { min-width: 0; padding: 19px; border: 1px solid var(--border); border-radius: 22px; background: rgba(17,17,17,.025); }
+.weekly-day-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid var(--border); }
+.weekly-day-heading p { margin: 0 0 3px; color: var(--accent); font-size: 12px; font-weight: 900; text-transform: uppercase; }
+.weekly-day-heading h3 { margin: 0; font-size: 19px; line-height: 1.15; text-transform: capitalize; }
+.weekly-edit-day { min-height: 36px; padding: 7px 11px; white-space: nowrap; }
+.weekly-day-card section + section { margin-top: 14px; }
+.weekly-day-card h4 { margin: 0 0 7px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.weekly-day-card ul { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.weekly-day-card li { position: relative; padding-left: 13px; font-size: 14px; line-height: 1.38; }
+.weekly-day-card li::before { content: ""; position: absolute; left: 0; top: .55em; width: 5px; height: 5px; border-radius: 99px; background: var(--accent); }
+.weekly-holiday { margin: 0; padding: 18px; border-radius: 15px; background: rgba(255,149,0,.10); color: #9a5700; font-weight: 850; text-align: center; }
+@media (max-width: 720px) {
+  .editor-view-switch { width: 100%; }
+  .weekly-days-grid { grid-template-columns: 1fr; gap: 13px; }
+  .weekly-day-card { padding: 16px; }
+  .weekly-day-heading h3 { font-size: 18px; }
+  .week-state { display: none; }
+}
+@media (prefers-color-scheme: dark) {
+  .editor-view-switch { background: rgba(255,255,255,.07); }
+  .view-switch-button.is-active { background: rgba(255,255,255,.11); }
+  .weekly-day-card { background: rgba(255,255,255,.035); }
+  .week-state.is-complete, .week-status.is-complete { color: #73df96; background: rgba(41,173,88,.18); }
+  .week-state.is-partial, .week-status.is-partial { color: #ffbd61; background: rgba(255,149,0,.18); }
+}

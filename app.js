@@ -5,6 +5,8 @@ let menuPublicado = null;
 let menuTrabajo = null;
 let shaPublicado = null;
 let fechaActiva = "";
+let fechasSemanaActiva = [];
+let modoEditor = "semana";
 let hayCambios = false;
 let borradorImportacion = null;
 let comparacionImportacion = null;
@@ -59,6 +61,7 @@ function agruparSemanasPublicadas(dias) {
 function formatoRangoSemana(fechas) {
   const inicio = fechaDesdeClave(fechas[0]);
   const fin = fechaDesdeClave(fechas.at(-1));
+  if (fechas.length === 1) return formatearFecha(inicio);
   const mismoMes = inicio.getMonth() === fin.getMonth() && inicio.getFullYear() === fin.getFullYear();
   const mesFin = new Intl.DateTimeFormat("es-ES", { month: "long", year: "numeric" }).format(fin);
   if (mismoMes) return `${inicio.getDate()}–${fin.getDate()} ${mesFin}`;
@@ -68,9 +71,81 @@ function formatoRangoSemana(fechas) {
 }
 
 function abrirSemanaDesdeResumen(fecha) {
+  const semana = agruparSemanasPublicadas(menuTrabajo?.dias || {}).find(item => item.fechas.includes(fecha));
+  fechasSemanaActiva = semana?.fechas || [fecha];
   cambiarVista("vista-editor");
   $("selector-fecha").value = fecha;
-  mostrarMenuDeFecha(fecha);
+  mostrarVistaEditor("semana");
+}
+
+function etiquetaEstadoSemana(fechas) {
+  const laborables = fechas.filter(clave => !menuTrabajo?.dias?.[clave]?.festivo).length;
+  if (fechas.length === 1) return { texto: "Día suelto", clase: "is-partial" };
+  if (laborables >= 5 || fechas.length >= 5) return { texto: "Completa", clase: "is-complete" };
+  return { texto: `${laborables}/5 días`, clase: "is-partial" };
+}
+
+function obtenerSemanaDeFecha(clave) {
+  return agruparSemanasPublicadas(menuTrabajo?.dias || {}).find(item => item.fechas.includes(clave)) || { fechas: clave ? [clave] : [] };
+}
+
+function mostrarVistaEditor(modo) {
+  modoEditor = modo;
+  const semanal = modo === "semana";
+  $("vista-semana-btn").classList.toggle("is-active", semanal);
+  $("vista-dia-btn").classList.toggle("is-active", !semanal);
+  $("editor-semana").hidden = !semanal;
+  if (semanal) {
+    $("editor-contenido").hidden = true;
+    $("editor-vacio").hidden = true;
+    renderizarVistaSemanal();
+  } else {
+    mostrarMenuDeFecha($("selector-fecha").value);
+  }
+}
+
+function renderizarVistaSemanal() {
+  const claveBase = $("selector-fecha").value || fechasSemanaActiva[0] || "";
+  const semana = obtenerSemanaDeFecha(claveBase);
+  fechasSemanaActiva = semana.fechas;
+  const contenedor = $("semana-dias");
+  contenedor.innerHTML = "";
+  if (!semana.fechas.length) {
+    $("editor-semana").hidden = true;
+    $("editor-vacio").hidden = false;
+    return;
+  }
+  const estado = etiquetaEstadoSemana(semana.fechas);
+  $("semana-titulo").textContent = formatoRangoSemana(semana.fechas);
+  $("semana-detalle").textContent = `${semana.fechas.length} ${semana.fechas.length === 1 ? "fecha disponible" : "fechas disponibles"}. Revisa toda la semana y abre un día solo cuando necesites editarlo.`;
+  $("semana-estado").textContent = estado.texto;
+  $("semana-estado").className = `read-only-badge week-status ${estado.clase}`;
+  const referenciaDisponible = Boolean(imagenReferenciaImportacion && semana.fechas.some(fecha => fechasReferenciaImportacion.has(fecha)));
+  $("semana-referencia").hidden = !referenciaDisponible;
+  if (referenciaDisponible) $("semana-referencia-img").src = imagenReferenciaImportacion;
+
+  semana.fechas.forEach(clave => {
+    const menu = normalizarMenuDia(menuTrabajo.dias[clave]);
+    const card = document.createElement("article");
+    card.className = "weekly-day-card";
+    const contenido = menu.festivo
+      ? '<p class="weekly-holiday">Festivo / sin servicio</p>'
+      : [
+          ["Primeros", menu.primeros],
+          ["Segundos", menu.segundos],
+          ["Dieta y plancha", menu.dieta]
+        ].map(([titulo, platos]) => `<section><h4>${titulo}</h4><ul>${platos.map(plato => `<li>${escapeHtml(plato)}</li>`).join("")}</ul></section>`).join("");
+    card.innerHTML = `<div class="weekly-day-heading"><div><p>${new Intl.DateTimeFormat("es-ES", { weekday: "long" }).format(fechaDesdeClave(clave))}</p><h3>${new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "long" }).format(fechaDesdeClave(clave))}</h3></div><button type="button" class="secondary-action weekly-edit-day">Editar día</button></div>${contenido}`;
+    card.querySelector(".weekly-edit-day").addEventListener("click", () => {
+      $("selector-fecha").value = clave;
+      mostrarVistaEditor("dia");
+    });
+    contenedor.appendChild(card);
+  });
+}
+
+function escapeHtml(texto) {
+  return String(texto ?? "").replace(/[&<>"']/g, caracter => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[caracter]);
 }
 
 function mostrarResumen(datos) {
@@ -93,7 +168,9 @@ function mostrarResumen(datos) {
     boton.type = "button";
     boton.className = "week-row";
     const festivosSemana = semana.fechas.filter(f => dias[f]?.festivo).length;
-    boton.innerHTML = `<span><strong>${formatoRangoSemana(semana.fechas)}</strong><small>${semana.fechas.length - festivosSemana} días publicados${festivosSemana ? ` · ${festivosSemana} festivo${festivosSemana === 1 ? "" : "s"}` : ""}</small></span><span class="week-arrow">›</span>`;
+    const estadoSemana = etiquetaEstadoSemana(semana.fechas);
+    const diasPublicados = semana.fechas.length - festivosSemana;
+    boton.innerHTML = `<span><strong>${formatoRangoSemana(semana.fechas)}</strong><small>${diasPublicados} ${diasPublicados === 1 ? "día publicado" : "días publicados"}${festivosSemana ? ` · ${festivosSemana} festivo${festivosSemana === 1 ? "" : "s"}` : ""}</small></span><span class="week-row-side"><em class="week-state ${estadoSemana.clase}">${estadoSemana.texto}</em><span class="week-arrow">›</span></span>`;
     boton.addEventListener("click", () => abrirSemanaDesdeResumen(semana.fechas[0]));
     lista.appendChild(boton);
   });
@@ -252,7 +329,8 @@ function abrirEditor() {
   cambiarVista("vista-editor");
   const selector = $("selector-fecha");
   if (!selector.value && selector.options.length > 1) selector.selectedIndex = 1;
-  mostrarMenuDeFecha(selector.value);
+  fechasSemanaActiva = obtenerSemanaDeFecha(selector.value).fechas;
+  mostrarVistaEditor("semana");
 }
 
 function volverAlInicio() {
@@ -275,7 +353,8 @@ function crearFecha() {
   };
   fechaActiva = clave;
   cargarSelectorFechas(menuTrabajo, clave);
-  mostrarMenuDeFecha(clave);
+  fechasSemanaActiva = obtenerSemanaDeFecha(clave).fechas;
+  mostrarVistaEditor("dia");
   actualizarEstadoCambios();
   mostrarMensaje("Fecha creada. Revisa los textos antes de publicar.", "success");
 }
@@ -1479,7 +1558,12 @@ function prepararEventos() {
   $("aplicar-semana").addEventListener("click", aplicarSemanaAlEditor);
   $("volver-inicio").addEventListener("click", volverAlInicio);
   $("cerrar-sesion").addEventListener("click", cerrarSesion);
-  $("selector-fecha").addEventListener("change", event => mostrarMenuDeFecha(event.target.value));
+  $("selector-fecha").addEventListener("change", event => {
+    fechasSemanaActiva = obtenerSemanaDeFecha(event.target.value).fechas;
+    if (modoEditor === "semana") renderizarVistaSemanal(); else mostrarMenuDeFecha(event.target.value);
+  });
+  $("vista-semana-btn").addEventListener("click", () => mostrarVistaEditor("semana"));
+  $("vista-dia-btn").addEventListener("click", () => mostrarVistaEditor("dia"));
   $("crear-fecha").addEventListener("click", crearFecha);
   $("editor-festivo").addEventListener("change", () => { actualizarFestivoUI(); sincronizarDesdeFormulario(); });
   document.querySelectorAll(".add-item").forEach(boton => boton.addEventListener("click", () => {
@@ -1493,6 +1577,7 @@ function prepararEventos() {
   $("eliminar-fecha").addEventListener("click", eliminarFecha);
   $("publicar-menu").addEventListener("click", publicarMenu);
   $("ampliar-referencia").addEventListener("click", abrirReferencia);
+  $("ampliar-referencia-semana").addEventListener("click", abrirReferencia);
   $("cerrar-referencia").addEventListener("click", cerrarReferencia);
   $("reference-dialog").addEventListener("click", event => { if (event.target === $("reference-dialog")) cerrarReferencia(); });
   window.addEventListener("beforeunload", event => { if (hayCambios) { event.preventDefault(); event.returnValue = ""; } });
