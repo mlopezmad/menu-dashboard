@@ -608,7 +608,8 @@ function pintarFormularioDias(dias, diagnostico = null) {
           const badge = document.createElement("small");
           badge.className = "ocr-confidence-badge";
           badge.textContent = nivel === "alta" ? "Alta" : nivel === "media" ? "Revisar" : "Baja";
-          fila.appendChild(badge);
+          input.dataset.confidenceLabel = badge.textContent;
+          fila._confidenceBadge = badge;
         }
         input.addEventListener("input", () => {
           fila.classList.remove("ocr-needs-review", "ocr-confidence-media", "ocr-confidence-baja");
@@ -616,7 +617,9 @@ function pintarFormularioDias(dias, diagnostico = null) {
           fila.querySelector(".ocr-confidence-badge")?.remove();
         });
         input.addEventListener("change", () => aprenderCorreccionOcr(input.dataset.ocrOriginal || "", input.value));
-        fila.append(numero, input); lista.appendChild(fila);
+        fila.append(numero, input);
+        if (fila._confidenceBadge) fila.appendChild(fila._confidenceBadge);
+        lista.appendChild(fila);
       }
       bloque.appendChild(lista);
     }

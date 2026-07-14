@@ -1,0 +1,6 @@
+V7.1 · Corrección visual de campos OCR
+
+- Los textos de los platos vuelven a mostrarse correctamente en móvil.
+- Los indicadores Alta/Revisar/Baja ya no desplazan ni ocultan los campos.
+- Se elimina la etiqueta REVISAR duplicada.
+- No cambia OCR, calibración, publicación ni aprendizaje local.
