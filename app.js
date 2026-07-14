@@ -11,6 +11,11 @@ let comparacionImportacion = null;
 let fuenteImportacion = null;
 let urlPreviewImportacion = null;
 let limitesFilasDetectados = null;
+const CALIBRATION_KEY = "menu-dashboard-v5-calibration";
+const DEFAULT_GRID_X = [0, 0.20, 0.40, 0.60, 0.80, 1];
+const DEFAULT_GRID_Y = [0, 0.17, 0.33, 0.50, 0.67, 0.83, 1];
+let gridX = [...DEFAULT_GRID_X];
+let gridY = [...DEFAULT_GRID_Y];
 
 function fechaDesdeClave(clave) {
   const [year, month, day] = clave.split("-").map(Number);
@@ -631,9 +636,40 @@ function valoresRecorte() {
   return { top: top / 100, bottom: Math.min(bottom, 100) / 100, left: left / 100, right: Math.min(right, 100) / 100 };
 }
 
+function cargarCalibracionGuardada() {
+  try {
+    const data = JSON.parse(localStorage.getItem(CALIBRATION_KEY) || "null");
+    if (Array.isArray(data?.gridX) && data.gridX.length === 6) gridX = data.gridX;
+    if (Array.isArray(data?.gridY) && data.gridY.length === 7) gridY = data.gridY;
+    if (data?.crop) {
+      for (const id of ["top", "bottom", "left", "right"]) {
+        const input = $(`crop-${id}`);
+        if (input && Number.isFinite(Number(data.crop[id]))) input.value = data.crop[id];
+      }
+    }
+  } catch (error) { console.warn("No se pudo cargar la calibración", error); }
+  sincronizarSlidersCalibracion();
+}
+
+function sincronizarSlidersCalibracion() {
+  document.querySelectorAll(".grid-x").forEach(input => { input.value = Math.round(gridX[Number(input.dataset.index)] * 100); });
+  document.querySelectorAll(".grid-y").forEach(input => { input.value = Math.round(gridY[Number(input.dataset.index)] * 100); });
+}
+
+function leerSlidersCalibracion() {
+  document.querySelectorAll(".grid-x").forEach(input => { gridX[Number(input.dataset.index)] = Number(input.value) / 100; });
+  document.querySelectorAll(".grid-y").forEach(input => { gridY[Number(input.dataset.index)] = Number(input.value) / 100; });
+  gridX[0] = 0; gridX[5] = 1; gridY[0] = 0; gridY[6] = 1;
+}
+
+function rejillaValida() {
+  const ordenada = valores => valores.every((v, i) => i === 0 || v > valores[i - 1] + 0.035);
+  return ordenada(gridX) && ordenada(gridY);
+}
+
 function dibujarPreviewRecorte() {
   if (!fuenteImportacion) return;
-  limitesFilasDetectados = null;
+  leerSlidersCalibracion();
   const preview = $("recorte-preview");
   const ctx = preview.getContext("2d");
   const maxW = 900;
@@ -642,12 +678,75 @@ function dibujarPreviewRecorte() {
   preview.height = Math.round(fuenteImportacion.height * escala);
   ctx.drawImage(fuenteImportacion, 0, 0, preview.width, preview.height);
   const r = valoresRecorte();
-  const x = r.left * preview.width, y = r.top * preview.height, w = (r.right-r.left)*preview.width, h = (r.bottom-r.top)*preview.height;
+  const x = r.left * preview.width, y = r.top * preview.height;
+  const w = (r.right-r.left)*preview.width, h = (r.bottom-r.top)*preview.height;
   ctx.fillStyle = "rgba(0,0,0,.48)";
   ctx.fillRect(0,0,preview.width,y); ctx.fillRect(0,y,x,h); ctx.fillRect(x+w,y,preview.width-x-w,h); ctx.fillRect(0,y+h,preview.width,preview.height-y-h);
   ctx.strokeStyle = "#e30613"; ctx.lineWidth = Math.max(3, preview.width/250); ctx.strokeRect(x,y,w,h);
-  ctx.strokeStyle = "rgba(227,6,19,.65)"; ctx.lineWidth = 2;
-  for (let i=1;i<5;i++) { const xx=x+w*i/5; ctx.beginPath(); ctx.moveTo(xx,y); ctx.lineTo(xx,y+h); ctx.stroke(); }
+  ctx.lineWidth = Math.max(2, preview.width/400);
+  gridX.slice(1,-1).forEach(pos => { const xx=x+w*pos; ctx.strokeStyle="rgba(0,122,255,.92)"; ctx.beginPath(); ctx.moveTo(xx,y); ctx.lineTo(xx,y+h); ctx.stroke(); });
+  gridY.slice(1,-1).forEach(pos => { const yy=y+h*pos; ctx.strokeStyle="rgba(227,6,19,.92)"; ctx.beginPath(); ctx.moveTo(x,yy); ctx.lineTo(x+w,yy); ctx.stroke(); });
+  for (let fila=0; fila<6; fila++) for (let col=0; col<5; col++) {
+    const cx=x+w*(gridX[col]+gridX[col+1])/2, cy=y+h*(gridY[fila]+gridY[fila+1])/2;
+    ctx.fillStyle="rgba(17,17,17,.72)"; ctx.beginPath(); ctx.arc(cx,cy,Math.max(9,preview.width/70),0,Math.PI*2); ctx.fill();
+    ctx.fillStyle="#fff"; ctx.font=`700 ${Math.max(10,preview.width/85)}px sans-serif`; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(String(fila*5+col+1),cx,cy);
+  }
+}
+
+function guardarCalibracion() {
+  leerSlidersCalibracion();
+  if (!rejillaValida()) return mostrarMensajeCalibracion("Las líneas se cruzan o están demasiado juntas.", "error");
+  const crop = {};
+  for (const id of ["top", "bottom", "left", "right"]) crop[id] = Number($(`crop-${id}`).value);
+  localStorage.setItem(CALIBRATION_KEY, JSON.stringify({ gridX, gridY, crop, savedAt: new Date().toISOString() }));
+  mostrarMensajeCalibracion("Calibración guardada en este dispositivo.", "success");
+}
+
+function restaurarCalibracion() {
+  gridX = [...DEFAULT_GRID_X]; gridY = [...DEFAULT_GRID_Y];
+  localStorage.removeItem(CALIBRATION_KEY);
+  sincronizarSlidersCalibracion(); dibujarPreviewRecorte();
+  $("diagnostico-celdas").hidden = true;
+  mostrarMensajeCalibracion("Calibración restaurada a los valores iniciales.", "info");
+}
+
+function mostrarMensajeCalibracion(texto, tipo="info") {
+  const el = $("calibracion-mensaje");
+  el.textContent = texto; el.className = `editor-message message-${tipo}`;
+}
+
+function crearRecorteCalibrado(columna, fila) {
+  const r = valoresRecorte();
+  const tablaX = fuenteImportacion.width * r.left, tablaY = fuenteImportacion.height * r.top;
+  const tablaW = fuenteImportacion.width * (r.right-r.left), tablaH = fuenteImportacion.height * (r.bottom-r.top);
+  const x0 = gridX[columna], x1 = gridX[columna+1], y0 = gridY[fila], y1 = gridY[fila+1];
+  const margenX = Math.min(0.025, (x1-x0)*0.10), margenY = Math.min(0.035, (y1-y0)*0.14);
+  const sx = tablaX + tablaW*(x0+margenX), sy = tablaY + tablaH*(y0+margenY);
+  const sw = tablaW*Math.max(0.01, x1-x0-2*margenX), sh = tablaH*Math.max(0.01, y1-y0-2*margenY);
+  const canvas=document.createElement("canvas");
+  const scale=Math.min(3, 700/Math.max(sw,1));
+  canvas.width=Math.max(240,Math.round(sw*scale)); canvas.height=Math.max(95,Math.round(sh*scale));
+  const ctx=canvas.getContext("2d",{alpha:false}); ctx.fillStyle="#fff"; ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.drawImage(fuenteImportacion,sx,sy,sw,sh,0,0,canvas.width,canvas.height);
+  return canvas;
+}
+
+function generarVistaCeldas() {
+  if (!fuenteImportacion) return;
+  leerSlidersCalibracion();
+  if (!rejillaValida()) return mostrarMensajeCalibracion("Corrige las líneas antes de generar los recortes.", "error");
+  const contenedor=$("celdas-preview"); contenedor.innerHTML="";
+  const dias=["Lunes","Martes","Miércoles","Jueves","Viernes"];
+  for (let fila=0; fila<6; fila++) for (let col=0; col<5; col++) {
+    const item=document.createElement("article"); item.className="cell-preview-card";
+    const cab=document.createElement("div"); cab.className="cell-preview-heading";
+    const tipo=fila<3?"Primero":"Segundo", numero=(fila%3)+1;
+    cab.innerHTML=`<strong>${dias[col]}</strong><span>${tipo} ${numero}</span>`;
+    item.append(cab,crearRecorteCalibrado(col,fila)); contenedor.appendChild(item);
+  }
+  $("diagnostico-celdas").hidden=false;
+  mostrarMensajeCalibracion("Recortes generados. Comprueba visualmente los 30.", "success");
+  $("diagnostico-celdas").scrollIntoView({behavior:"smooth",block:"start"});
 }
 
 function detectarLimitesFilasTabla() {
@@ -849,17 +948,19 @@ async function leerFotoConOcr() {
 }
 
 async function fotoSeleccionada() {
-  const archivo=$("foto-menu").files?.[0];
-  $("leer-foto").disabled=!archivo; $("revision-ocr").hidden=true; $("resultado-importacion").hidden=true;
-  if (!archivo) { fuenteImportacion=null; limitesFilasDetectados=null; $("recorte-panel").hidden=true; return; }
-  $("ocr-progreso").textContent="Preparando vista previa…"; $("ocr-progreso").className="editor-message message-info";
+  const archivo = $("foto-menu").files?.[0];
+  $("diagnostico-celdas").hidden = true;
+  if (!archivo) { fuenteImportacion = null; $("recorte-panel").hidden = true; return; }
+  mostrarMensajeCalibracion("Preparando vista previa…", "info");
   try {
-    fuenteImportacion=await cargarFuenteImagen(archivo); limitesFilasDetectados=null;
-    $("recorte-panel").hidden=false; dibujarPreviewRecorte();
-    $("ocr-progreso").textContent="Ajusta el marco a la tabla y pulsa Leer 30 celdas.";
-  } catch(error) {
-    console.error(error); fuenteImportacion=null; $("leer-foto").disabled=true;
-    $("ocr-progreso").textContent="No se pudo preparar el archivo."; $("ocr-progreso").className="editor-message message-error";
+    fuenteImportacion = await cargarFuenteImagen(archivo);
+    cargarCalibracionGuardada();
+    $("recorte-panel").hidden = false;
+    dibujarPreviewRecorte();
+    mostrarMensajeCalibracion("Ajusta el marco y la rejilla. Después genera los 30 recortes.", "info");
+  } catch (error) {
+    console.error(error); fuenteImportacion = null;
+    mostrarMensajeCalibracion("No se pudo preparar el archivo.", "error");
   }
 }
 
@@ -881,14 +982,11 @@ function prepararEventos() {
   $("abrir-importador").addEventListener("click", abrirImportador);
   $("volver-importador").addEventListener("click", volverDesdeImportador);
   $("foto-menu").addEventListener("change", fotoSeleccionada);
-  ["crop-top", "crop-bottom", "crop-left", "crop-right"].forEach(id => $(id).addEventListener("input", dibujarPreviewRecorte));
-  $("leer-foto").addEventListener("click", leerFotoConOcr);
-  $("plantilla-semana").addEventListener("click", crearPlantillaSemana);
-  $("preparar-semana").addEventListener("click", prepararSemanaDesdeTexto);
-  $("permitir-actualizaciones").addEventListener("change", event => {
-    $("aplicar-semana").disabled = comparacionImportacion?.modificados?.length ? !event.target.checked : false;
-  });
-  $("aplicar-semana").addEventListener("click", aplicarSemanaAlEditor);
+  ["crop-top", "crop-bottom", "crop-left", "crop-right"].forEach(id => $(id).addEventListener("input", () => { dibujarPreviewRecorte(); $("diagnostico-celdas").hidden = true; }));
+  document.querySelectorAll(".grid-slider").forEach(input => input.addEventListener("input", () => { leerSlidersCalibracion(); dibujarPreviewRecorte(); $("diagnostico-celdas").hidden = true; }));
+  $("guardar-calibracion").addEventListener("click", guardarCalibracion);
+  $("restaurar-calibracion").addEventListener("click", restaurarCalibracion);
+  $("generar-celdas").addEventListener("click", generarVistaCeldas);
   $("volver-inicio").addEventListener("click", volverAlInicio);
   $("cerrar-sesion").addEventListener("click", cerrarSesion);
   $("selector-fecha").addEventListener("change", event => mostrarMenuDeFecha(event.target.value));

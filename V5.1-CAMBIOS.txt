@@ -1,0 +1,9 @@
+MENÚ DASHBOARD V5.1 · CALIBRACIÓN VISUAL
+
+- Mantiene login, editor y publicación de la V4.
+- Sustituye temporalmente el OCR por un modo de diagnóstico.
+- Permite ajustar el marco exterior de la tabla.
+- Permite mover cuatro separadores verticales y cinco horizontales.
+- Guarda la calibración en localStorage del dispositivo.
+- Genera una vista previa de las 30 celdas (5 días x 6 platos).
+- En esta fase no interpreta ni publica la foto.
