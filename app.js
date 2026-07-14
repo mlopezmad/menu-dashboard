@@ -1266,32 +1266,92 @@ function contextoCeldaReferencia(input = campoRevisionActivo) {
 function crearImagenCeldaReferencia(dia, plato) {
   if (!fuenteImportacion) return null;
   const g = geometriaCelda(dia, plato);
-  const margenX = Math.max(12, g.sw * .16);
-  const margenY = Math.max(10, g.sh * 1.15);
-  const sx = Math.max(0, g.sx - margenX);
-  const sy = Math.max(0, g.sy - margenY);
-  const sw = Math.min(fuenteImportacion.width - sx, g.sw + margenX * 2);
-  const sh = Math.min(fuenteImportacion.height - sy, g.sh + margenY * 2);
-  const escala = Math.min(3.2, Math.max(1.45, 900 / Math.max(sw, 1)));
+  const r = valoresRecorte();
+  const columnas = limitesColumnasCalibrados();
+  const filas = limitesFilasCalibrados();
+  const x0 = columnas[dia];
+  const x1 = columnas[dia + 1];
+  const anchoTabla = fuenteImportacion.width * (r.right - r.left);
+  const altoTabla = fuenteImportacion.height * (r.bottom - r.top);
+  const bandasPlato = [0, 1, 2, 4, 5, 6];
+  const banda = bandasPlato[plato];
+  const bandaInicio = plato < 3 ? Math.max(0, banda - 1) : Math.max(3, banda - 1);
+  const bandaFin = plato < 3 ? Math.min(4, banda + 2) : Math.min(7, banda + 2);
+
+  // Mantiene la columna completa del día y añade contexto vertical:
+  // título de sección + plato anterior/actual/siguiente cuando sea posible.
+  const margenColumna = Math.max(8, anchoTabla * (x1 - x0) * 0.035);
+  const sx = Math.max(0, fuenteImportacion.width * r.left + anchoTabla * x0 - margenColumna);
+  const ex = Math.min(fuenteImportacion.width, fuenteImportacion.width * r.left + anchoTabla * x1 + margenColumna);
+  const sy = Math.max(0, fuenteImportacion.height * r.top + altoTabla * filas[bandaInicio]);
+  const ey = Math.min(fuenteImportacion.height, fuenteImportacion.height * r.top + altoTabla * filas[bandaFin]);
+  const sw = Math.max(1, ex - sx);
+  const sh = Math.max(1, ey - sy);
+
+  const escala = Math.min(2.7, Math.max(1.15, 980 / Math.max(sw, 1)));
   const canvas = document.createElement("canvas");
-  canvas.width = Math.max(640, Math.round(sw * escala));
-  canvas.height = Math.max(360, Math.round(sh * escala));
+  canvas.width = Math.max(720, Math.round(sw * escala));
+  canvas.height = Math.max(520, Math.round(sh * escala));
   const ctx = canvas.getContext("2d", { alpha: false });
   ctx.fillStyle = "#fff";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
   ctx.drawImage(fuenteImportacion, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+
   const rx = ((g.sx - sx) / sw) * canvas.width;
   const ry = ((g.sy - sy) / sh) * canvas.height;
   const rw = (g.sw / sw) * canvas.width;
   const rh = (g.sh / sh) * canvas.height;
   ctx.strokeStyle = "#e30613";
-  ctx.lineWidth = Math.max(7, canvas.width / 150);
-  ctx.setLineDash([18, 12]);
+  ctx.lineWidth = Math.max(6, canvas.width / 170);
+  ctx.setLineDash([16, 11]);
   ctx.strokeRect(rx, ry, rw, rh);
   ctx.setLineDash([]);
-  return canvas.toDataURL("image/jpeg", .94);
+  return canvas.toDataURL("image/jpeg", .95);
+}
+
+function textoCoincideConCatalogo(texto) {
+  const normal = normalizarOcr(texto || "");
+  if (!normal) return false;
+  return diccionarioPlatos().some(plato => normalizarOcr(plato) === normal);
+}
+
+function actualizarEditorReferencia() {
+  const editor = $("reference-editor");
+  const input = $("reference-edit-input");
+  const original = $("reference-ocr-original");
+  const estado = $("reference-match-status");
+  const progreso = $("reference-review-progress");
+  const activo = campoRevisionActivo && referenciaCeldaActiva;
+  if (!editor || !input || !original || !estado || !progreso) return;
+  editor.hidden = !activo;
+  if (!activo) return;
+
+  original.textContent = campoRevisionActivo.dataset.ocrOriginal || campoRevisionActivo.value || "Sin texto detectado";
+  if (document.activeElement !== input) input.value = campoRevisionActivo.value;
+  const coincide = textoCoincideConCatalogo(input.value);
+  estado.hidden = !input.value.trim();
+  estado.className = `reference-match-status ${coincide ? "is-match" : "is-pending"}`;
+  estado.textContent = coincide
+    ? "✓ Plato reconocido. Coincide con el catálogo."
+    : "Comprueba el texto con la celda original.";
+
+  const pendientes = camposPendientesRevision();
+  const barra = document.getElementById("guided-review-bar");
+  const total = Number(barra?.dataset.total || pendientes.length || 1);
+  const resueltos = Math.max(0, total - pendientes.length);
+  progreso.textContent = pendientes.length
+    ? `${Math.min(total, resueltos + 1)} de ${total} · ${pendientes.length} pendientes`
+    : `${total} de ${total} · completado`;
+}
+
+function aplicarEdicionDesdeReferencia() {
+  if (!campoRevisionActivo) return;
+  const valor = $("reference-edit-input")?.value ?? "";
+  campoRevisionActivo.value = valor;
+  campoRevisionActivo.dispatchEvent(new Event("input", { bubbles: true }));
+  actualizarEditorReferencia();
 }
 
 function actualizarReferenciaCeldaActiva(input = campoRevisionActivo) {
@@ -1319,6 +1379,7 @@ function mostrarModoReferencia(modo = referenciaModo) {
   $("reference-show-cell").disabled = !contexto || !fuenteImportacion;
   const stage = $("reference-dialog").querySelector(".reference-dialog-stage");
   stage.scrollTop = 0; stage.scrollLeft = 0;
+  actualizarEditorReferencia();
 }
 
 function abrirReferencia() {
@@ -1780,6 +1841,14 @@ function prepararEventos() {
   $("cerrar-referencia").addEventListener("click", cerrarReferencia);
   $("reference-show-cell")?.addEventListener("click", () => mostrarModoReferencia("celda"));
   $("reference-show-full")?.addEventListener("click", () => mostrarModoReferencia("completo"));
+  $("reference-edit-input")?.addEventListener("input", aplicarEdicionDesdeReferencia);
+  $("reference-review-close")?.addEventListener("click", cerrarReferencia);
+  $("reference-review-next")?.addEventListener("click", () => {
+    aplicarEdicionDesdeReferencia();
+    const actual = campoRevisionActivo;
+    cerrarReferencia();
+    window.setTimeout(() => confirmarYSiguiente(actual), 80);
+  });
   $("reference-dialog").addEventListener("click", event => { if (event.target === $("reference-dialog")) cerrarReferencia(); });
   $("ampliar-referencia-compacta")?.addEventListener("click", abrirReferencia);
   $("abrir-referencia-compacta")?.addEventListener("click", abrirReferencia);

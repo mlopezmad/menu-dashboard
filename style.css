@@ -1868,3 +1868,121 @@ body.guided-review-open .reference-floating-button {
   .reference-dialog-stage img { min-width: 150vw; }
   .reference-dialog-stage img[src^="data:image/jpeg"] { }
 }
+
+/* V11.6.1 · Recorte contextual y corrección dentro del visor */
+.reference-dialog[open] {
+  grid-template-rows: auto minmax(300px, 1fr) auto;
+}
+.reference-dialog-stage {
+  min-height: 300px;
+  background: #000;
+}
+.reference-dialog-stage img[src^="data:image/jpeg"] {
+  min-width: min(96%, 860px);
+  width: auto;
+  max-width: 1180px;
+}
+.reference-editor {
+  padding: 18px 22px max(20px, env(safe-area-inset-bottom));
+  background: rgba(12,12,12,.98);
+  color: #fff;
+  border-top: 1px solid rgba(255,255,255,.12);
+}
+.reference-editor[hidden] { display: none; }
+.reference-editor-label {
+  margin: 0 0 6px;
+  color: rgba(255,255,255,.58);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+.reference-ocr-original {
+  margin: 0 0 18px;
+  color: rgba(255,255,255,.9);
+  font-size: 15px;
+  line-height: 1.35;
+}
+.reference-edit-label {
+  display: block;
+  margin-bottom: 7px;
+  color: rgba(255,255,255,.72);
+  font-size: 14px;
+}
+.reference-edit-input {
+  width: 100%;
+  min-height: 54px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 14px;
+  background: #fff;
+  color: #111;
+  font: inherit;
+  font-size: 17px;
+  font-weight: 700;
+}
+.reference-match-status {
+  margin: 10px 0 0;
+  font-size: 13px;
+  font-weight: 800;
+}
+.reference-match-status.is-match { color: #34c759; }
+.reference-match-status.is-pending { color: #ffcc00; }
+.reference-review-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 18px;
+  padding: 14px;
+  border-radius: 18px;
+  background: #fff;
+  color: #111;
+}
+.reference-review-card > div:first-child {
+  display: grid;
+  gap: 2px;
+}
+.reference-review-card strong { font-size: 16px; }
+.reference-review-card span {
+  color: #887b75;
+  font-size: 12px;
+  font-weight: 800;
+}
+.reference-review-actions {
+  display: flex;
+  gap: 8px;
+}
+.reference-review-actions button {
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 14px;
+}
+
+@media (max-width: 720px) {
+  .reference-dialog[open] {
+    grid-template-rows: auto minmax(260px, 44vh) auto;
+  }
+  .reference-dialog-stage {
+    min-height: 260px;
+    padding: 0;
+    align-items: center;
+  }
+  .reference-dialog-stage img[src^="data:image/jpeg"] {
+    min-width: 100%;
+    width: 100%;
+    max-width: none;
+  }
+  .reference-editor {
+    padding: 16px 16px max(16px, env(safe-area-inset-bottom));
+  }
+  .reference-review-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .reference-review-actions {
+    display: grid;
+    grid-template-columns: .8fr 1.4fr;
+  }
+  .reference-review-actions button { width: 100%; }
+}
